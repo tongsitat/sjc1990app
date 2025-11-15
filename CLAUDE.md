@@ -27,20 +27,60 @@ This document serves as a comprehensive guide for AI assistants (like Claude) wo
 
 ### Current State
 
-This repository is currently in its initial setup phase. As the codebase evolves, this section should be updated to reflect:
+**Project Name**: High School Classmates Connection Platform
 
-- **Project Type**: [Web app / Mobile app / API / Library / etc.]
-- **Tech Stack**: [Languages, frameworks, libraries]
-- **Development Stage**: [Planning / MVP / Production / etc.]
-- **Team Size**: [Solo / Small team / Large team]
+**Project Type**: Multi-platform communication application (Mobile + Web + Backend)
+
+**Tech Stack**:
+- **Frontend**: Flutter (iOS, Android, Web)
+- **Backend**: Python/Node.js (TBD) with AI/ML capabilities
+- **Database**: PostgreSQL/MongoDB (TBD)
+- **Communication**: SMS (Twilio), Email (SendGrid), WhatsApp API
+- **Infrastructure**: Cloud-based (AWS/GCP/Azure - TBD)
+
+**Development Stage**: Planning / Initial Architecture
+
+**Team Size**: Solo developer with 35 years of reunion organizing experience
+
+**Project Purpose**:
+A trusted, unified communication platform for high school classmates that bridges multiple communication channels (app, SMS, email, WhatsApp) based on individual preferences. Built to serve classmates who use different platforms while maintaining trust through personal ownership and operation.
 
 ### Key Milestones
 
-- [ ] Repository initialized
-- [ ] Project structure defined
-- [ ] Core dependencies configured
-- [ ] CI/CD pipeline setup
-- [ ] First release
+**Phase 1: Foundation**
+- [x] Repository initialized
+- [ ] Project architecture documented
+- [ ] Technology stack finalized
+- [ ] Development environment setup
+- [ ] Core database schema designed
+
+**Phase 2: Authentication & User Management**
+- [ ] SMS verification system implemented
+- [ ] User registration workflow (3-step process)
+- [ ] Peer approval system
+- [ ] User preference management
+- [ ] Class/house identification system
+
+**Phase 3: Core Communication**
+- [ ] 1:1 messaging within app
+- [ ] Main forum implementation
+- [ ] Interest-based sub-forums
+- [ ] Forum permissions and moderation
+
+**Phase 4: Cross-Channel Bridge (Priority)**
+- [ ] Email integration (send/receive)
+- [ ] SMS integration (send/receive)
+- [ ] WhatsApp integration (send/receive)
+- [ ] Message routing engine
+- [ ] Channel preference handler
+- [ ] Identity mapping across channels
+
+**Phase 5: Advanced Features**
+- [ ] AI-powered message formatting
+- [ ] Notification preferences
+- [ ] Media sharing across channels
+- [ ] Event planning and RSVP
+- [ ] Reunion organizing tools
 
 ---
 
@@ -50,30 +90,75 @@ This repository is currently in its initial setup phase. As the codebase evolves
 
 ```
 sjc1990app/
-├── src/              # Source code
-├── tests/            # Test files
-├── docs/             # Documentation
-├── config/           # Configuration files
-├── scripts/          # Build and utility scripts
-├── .github/          # GitHub workflows and templates
-└── CLAUDE.md         # This file
+├── mobile/                    # Flutter mobile/web app
+│   ├── lib/
+│   │   ├── models/           # Data models
+│   │   ├── screens/          # UI screens
+│   │   ├── widgets/          # Reusable widgets
+│   │   ├── services/         # API and business logic
+│   │   └── utils/            # Helper functions
+│   ├── test/                 # Flutter tests
+│   └── pubspec.yaml          # Flutter dependencies
+│
+├── backend/                   # Backend services
+│   ├── api/                  # REST/GraphQL API
+│   ├── auth/                 # Authentication service
+│   ├── messaging/            # Message routing engine
+│   ├── integrations/         # External service integrations
+│   │   ├── sms/             # SMS provider (Twilio)
+│   │   ├── email/           # Email service (SendGrid)
+│   │   └── whatsapp/        # WhatsApp Business API
+│   ├── ai/                   # AI/ML services
+│   ├── database/             # Database models and migrations
+│   └── tests/                # Backend tests
+│
+├── docs/                      # Documentation
+│   ├── architecture/         # System design diagrams
+│   ├── adr/                  # Architecture Decision Records
+│   ├── api/                  # API documentation
+│   └── guides/               # Development guides
+│
+├── infrastructure/            # IaC and deployment
+│   ├── docker/               # Docker configurations
+│   ├── k8s/                  # Kubernetes manifests (if used)
+│   └── terraform/            # Infrastructure as Code (if used)
+│
+├── scripts/                   # Build and utility scripts
+├── .github/                   # GitHub workflows and templates
+├── CLAUDE.md                  # AI assistant guide (this file)
+├── PROJECT_OVERVIEW.md        # Detailed project requirements
+├── ARCHITECTURE.md            # Technical architecture
+└── ROADMAP.md                 # Development roadmap
 ```
-
-**Note**: Update this structure as the project evolves.
 
 ### Key Directories
 
-#### `/src`
-- **Purpose**: All production source code
-- **Conventions**: [To be defined based on project type]
+#### `/mobile`
+- **Purpose**: Flutter cross-platform application (iOS, Android, Web)
+- **Conventions**: Follow Flutter/Dart style guide, feature-based organization
+- **Key Features**: User registration, messaging, forum participation, preference management
 
-#### `/tests`
-- **Purpose**: All test files (unit, integration, e2e)
-- **Conventions**: Mirror source directory structure
+#### `/backend`
+- **Purpose**: Backend services and API
+- **Conventions**: Microservices or modular monolith, RESTful/GraphQL API
+- **Key Components**:
+  - Authentication & authorization
+  - Message routing between channels
+  - Integration with external communication services
+  - AI-powered features
+
+#### `/backend/integrations`
+- **Purpose**: External service integrations for cross-channel communication
+- **Critical Services**:
+  - SMS (Twilio SDK)
+  - Email (SendGrid API)
+  - WhatsApp (Business API)
+- **Security**: All API keys in environment variables, never committed
 
 #### `/docs`
-- **Purpose**: Project documentation, ADRs, guides
-- **Conventions**: Use Markdown format
+- **Purpose**: Comprehensive project documentation
+- **Conventions**: Markdown format, keep updated with code changes
+- **Includes**: Architecture diagrams, API specs, user guides, ADRs
 
 ---
 
@@ -405,33 +490,110 @@ npm test -- --watch
 
 ### Technology Stack
 
-**To be updated as project develops:**
+**Frontend - Flutter Application**:
+- **Framework**: Flutter 3.x+ (Dart)
+- **State Management**: Provider/Riverpod/Bloc (TBD)
+- **UI Components**: Material Design / Custom widgets
+- **Platforms**: iOS, Android, Web
 
-- **Frontend**: [Framework/library]
-- **Backend**: [Language/framework]
-- **Database**: [Database type]
-- **Infrastructure**: [Cloud provider, services]
-- **CI/CD**: [GitHub Actions, Jenkins, etc.]
+**Backend Services**:
+- **Language**: Python (FastAPI) or Node.js (NestJS) - TBD
+- **API**: RESTful with potential GraphQL for complex queries
+- **Authentication**: JWT + SMS verification
+- **Real-time**: WebSockets for live messaging
+
+**Database**:
+- **Primary DB**: PostgreSQL (relational data, user profiles, forums)
+- **Cache**: Redis (session management, message queuing)
+- **Search**: Elasticsearch (optional, for message search)
+
+**External Integrations**:
+- **SMS**: Twilio API
+- **Email**: SendGrid or AWS SES
+- **WhatsApp**: WhatsApp Business API
+- **AI/ML**: OpenAI API or custom models
+
+**Infrastructure**:
+- **Hosting**: AWS/GCP/Azure (TBD)
+- **Containers**: Docker
+- **Orchestration**: Docker Compose (dev) / Kubernetes (prod, optional)
+- **Storage**: S3-compatible object storage (media files)
+- **CDN**: CloudFlare or cloud provider CDN
+
+**CI/CD**:
+- **Version Control**: GitHub
+- **CI/CD**: GitHub Actions
+- **Testing**: Jest/Pytest (backend), Flutter test framework
+- **Deployment**: Automated deployment to staging/production
 
 ### Key Dependencies
 
-List critical dependencies and their purposes:
+**Mobile (Flutter)**:
+1. **http/dio**: API communication
+2. **provider/riverpod**: State management
+3. **shared_preferences**: Local storage
+4. **firebase_messaging**: Push notifications (optional)
+5. **image_picker**: Media sharing
+6. **intl**: Internationalization
 
-1. **[Dependency Name]**: [Purpose]
-2. **[Dependency Name]**: [Purpose]
+**Backend**:
+1. **Twilio SDK**: SMS sending and receiving
+2. **SendGrid/AWS SES**: Email services
+3. **WhatsApp Business API SDK**: WhatsApp integration
+4. **PostgreSQL driver**: Database connectivity
+5. **Redis client**: Caching and queuing
+6. **JWT library**: Token-based authentication
+7. **WebSocket library**: Real-time messaging
+8. **OpenAI SDK**: AI-powered features (optional)
 
 ### Known Issues and Limitations
 
-Track known issues that AI assistants should be aware of:
+**Current Limitations** (to be resolved as project develops):
+- WhatsApp Business API requires approval and has rate limits
+- SMS costs accumulate with usage (budget consideration)
+- Email deliverability depends on domain reputation
+- Cross-channel identity mapping complexity
+- Real-time message synchronization across channels
 
-- [Issue description and workaround]
+**Technical Considerations**:
+- Phone number verification costs (Twilio charges)
+- WhatsApp Business API has strict templates for initial contact
+- Email-to-WhatsApp formatting challenges
+- Media file size limits vary by channel
+- Need to handle message delivery failures gracefully
+
+### Project-Specific Security Requirements
+
+**Critical Security Measures**:
+1. **Phone Number Verification**: Mandatory SMS verification for all users
+2. **Peer Approval**: New users require approval from existing members
+3. **PII Protection**: Real names and phone numbers must be encrypted at rest
+4. **Channel Security**:
+   - End-to-end encryption for in-app messages
+   - Secure storage of API credentials
+   - Token rotation for external services
+5. **Privacy Controls**: Users control who sees their contact info
+6. **Audit Logging**: Track all cross-channel message routing
+7. **Rate Limiting**: Prevent spam and abuse
+8. **GDPR Compliance**: User data export and deletion capabilities
+
+**Never Commit**:
+- Twilio API keys and Auth tokens
+- SendGrid API keys
+- WhatsApp Business API credentials
+- Database passwords
+- JWT secret keys
+- Any user data or phone numbers
 
 ### Architecture Decisions
 
 **Architecture Decision Records (ADRs)** should be stored in `/docs/adr/`:
 
-- ADR-001: [Title]
-- ADR-002: [Title]
+- ADR-001: Cross-platform mobile framework selection (Flutter)
+- ADR-002: Multi-channel messaging architecture
+- ADR-003: User verification and approval workflow
+- ADR-004: Database choice for scalability
+- ADR-005: Real-time messaging implementation
 
 ---
 
@@ -470,7 +632,7 @@ This document should be treated as living documentation:
 
 - **Date**: 2025-11-15
 - **Updated By**: Claude (AI Assistant)
-- **Changes**: Initial creation
+- **Changes**: Updated with High School Classmates Connection Platform project details, tech stack, milestones, and security requirements
 
 ---
 
