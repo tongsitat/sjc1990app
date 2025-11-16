@@ -33,10 +33,10 @@ This document serves as a comprehensive guide for AI assistants (like Claude) wo
 
 **Tech Stack**:
 - **Frontend**: Flutter (iOS, Android, Web)
-- **Backend**: Python/Node.js (TBD) with AI/ML capabilities
-- **Database**: PostgreSQL/MongoDB (TBD)
-- **Communication**: SMS (Twilio), Email (SendGrid), WhatsApp API
-- **Infrastructure**: Cloud-based (AWS/GCP/Azure - TBD)
+- **Backend**: Node.js (TypeScript) with AWS Lambda (Serverless)
+- **Database**: Amazon DynamoDB (NoSQL, serverless)
+- **Communication**: SMS (AWS SNS), Email (AWS SES), WhatsApp API
+- **Infrastructure**: AWS (Serverless - Lambda, API Gateway, DynamoDB)
 
 **Development Stage**: Planning / Initial Architecture
 
@@ -49,38 +49,49 @@ A trusted, unified communication platform for high school classmates that bridge
 
 **Phase 1: Foundation**
 - [x] Repository initialized
-- [ ] Project architecture documented
-- [ ] Technology stack finalized
+- [x] Project architecture documented
+- [x] Technology stack finalized (Node.js, DynamoDB, AWS Lambda)
 - [ ] Development environment setup
-- [ ] Core database schema designed
+- [ ] DynamoDB schema designed
+- [ ] AWS account and services configured
 
 **Phase 2: Authentication & User Management**
-- [ ] SMS verification system implemented
-- [ ] User registration workflow (3-step process)
+- [ ] SMS verification system implemented (AWS SNS)
+- [ ] User registration workflow (4-step process with photo tagging)
 - [ ] Peer approval system
 - [ ] User preference management
-- [ ] Class/house identification system
+- [ ] Classroom identification system (multi-classroom tracking)
+- [ ] Profile photo upload
 
-**Phase 3: Core Communication**
+**Phase 3: Photo Management & Recognition**
+- [ ] Old class photo upload system (admin)
+- [ ] Photo tagging interface (users tag themselves)
+- [ ] Photo gallery and browsing
+- [ ] Shared classroom discovery (who was in same class)
+- [ ] Profile linking (old photos to current profile)
+
+**Phase 4: Core Communication**
 - [ ] 1:1 messaging within app
 - [ ] Main forum implementation
 - [ ] Interest-based sub-forums
 - [ ] Forum permissions and moderation
+- [ ] Real-time messaging (WebSocket or AppSync)
 
-**Phase 4: Cross-Channel Bridge (Priority)**
-- [ ] Email integration (send/receive)
-- [ ] SMS integration (send/receive)
+**Phase 5: Cross-Channel Bridge (Priority)**
+- [ ] Email integration (send/receive via SES)
+- [ ] SMS integration (send/receive via SNS)
 - [ ] WhatsApp integration (send/receive)
-- [ ] Message routing engine
+- [ ] Message routing engine (Lambda-based)
 - [ ] Channel preference handler
 - [ ] Identity mapping across channels
 
-**Phase 5: Advanced Features**
-- [ ] AI-powered message formatting
-- [ ] Notification preferences
+**Phase 6: Advanced Features**
+- [ ] AI-powered photo face recognition (AWS Rekognition)
+- [ ] Notification preferences and digests
 - [ ] Media sharing across channels
 - [ ] Event planning and RSVP
 - [ ] Reunion organizing tools
+- [ ] Multi-tenant support (other graduating classes)
 
 ---
 
@@ -100,17 +111,29 @@ sjc1990app/
 │   ├── test/                 # Flutter tests
 │   └── pubspec.yaml          # Flutter dependencies
 │
-├── backend/                   # Backend services
-│   ├── api/                  # REST/GraphQL API
-│   ├── auth/                 # Authentication service
-│   ├── messaging/            # Message routing engine
+├── backend/                   # Serverless backend (Lambda functions)
+│   ├── functions/            # Lambda function handlers
+│   │   ├── auth/            # Authentication functions
+│   │   ├── users/           # User management functions
+│   │   ├── messages/        # Messaging functions
+│   │   ├── forums/          # Forum functions
+│   │   ├── photos/          # Photo management functions
+│   │   └── routing/         # Cross-channel routing functions
+│   ├── layers/               # Lambda layers (shared dependencies)
 │   ├── integrations/         # External service integrations
-│   │   ├── sms/             # SMS provider (Twilio)
-│   │   ├── email/           # Email service (SendGrid)
+│   │   ├── sns/             # AWS SNS for SMS
+│   │   ├── ses/             # AWS SES for email
 │   │   └── whatsapp/        # WhatsApp Business API
-│   ├── ai/                   # AI/ML services
-│   ├── database/             # Database models and migrations
+│   ├── shared/               # Shared utilities and models
+│   │   ├── models/          # DynamoDB data models
+│   │   ├── utils/           # Helper functions
+│   │   └── middleware/      # Lambda middleware
 │   └── tests/                # Backend tests
+│
+├── infrastructure/            # Infrastructure as Code
+│   ├── serverless.yml        # Serverless Framework config
+│   ├── cloudformation/       # CloudFormation templates (optional)
+│   └── scripts/              # Deployment scripts
 │
 ├── docs/                      # Documentation
 │   ├── architecture/         # System design diagrams
@@ -118,17 +141,13 @@ sjc1990app/
 │   ├── api/                  # API documentation
 │   └── guides/               # Development guides
 │
-├── infrastructure/            # IaC and deployment
-│   ├── docker/               # Docker configurations
-│   ├── k8s/                  # Kubernetes manifests (if used)
-│   └── terraform/            # Infrastructure as Code (if used)
-│
 ├── scripts/                   # Build and utility scripts
 ├── .github/                   # GitHub workflows and templates
 ├── CLAUDE.md                  # AI assistant guide (this file)
 ├── PROJECT_OVERVIEW.md        # Detailed project requirements
 ├── ARCHITECTURE.md            # Technical architecture
-└── ROADMAP.md                 # Development roadmap
+├── ROADMAP.md                 # Development roadmap
+└── AWS_COST_ANALYSIS.md       # AWS cost breakdown and estimates
 ```
 
 ### Key Directories
@@ -136,29 +155,41 @@ sjc1990app/
 #### `/mobile`
 - **Purpose**: Flutter cross-platform application (iOS, Android, Web)
 - **Conventions**: Follow Flutter/Dart style guide, feature-based organization
-- **Key Features**: User registration, messaging, forum participation, preference management
+- **Key Features**: User registration, photo tagging, messaging, forum participation, preference management
 
 #### `/backend`
-- **Purpose**: Backend services and API
-- **Conventions**: Microservices or modular monolith, RESTful/GraphQL API
+- **Purpose**: Serverless backend using AWS Lambda functions
+- **Conventions**: Node.js (TypeScript), function-per-endpoint pattern, shared layers
 - **Key Components**:
-  - Authentication & authorization
-  - Message routing between channels
-  - Integration with external communication services
-  - AI-powered features
+  - Lambda functions for all API endpoints
+  - DynamoDB for data persistence
+  - API Gateway for RESTful API
+  - AppSync or API Gateway WebSocket for real-time
+
+#### `/backend/functions`
+- **Purpose**: Individual Lambda function handlers
+- **Organization**: Grouped by domain (auth, users, messages, forums, photos, routing)
+- **Each function**: Single responsibility, minimal dependencies, fast cold start
 
 #### `/backend/integrations`
 - **Purpose**: External service integrations for cross-channel communication
 - **Critical Services**:
-  - SMS (Twilio SDK)
-  - Email (SendGrid API)
-  - WhatsApp (Business API)
-- **Security**: All API keys in environment variables, never committed
+  - SMS (AWS SNS - cost-effective for international)
+  - Email (AWS SES - integrated with AWS)
+  - WhatsApp (Business API via Twilio or direct)
+- **Security**: All API keys in AWS Secrets Manager or environment variables
+
+#### `/infrastructure`
+- **Purpose**: Infrastructure as Code using Serverless Framework
+- **Key Files**:
+  - `serverless.yml`: Main configuration for Lambda, API Gateway, DynamoDB
+  - CloudFormation templates for complex resources
+  - Deployment scripts
 
 #### `/docs`
 - **Purpose**: Comprehensive project documentation
 - **Conventions**: Markdown format, keep updated with code changes
-- **Includes**: Architecture diagrams, API specs, user guides, ADRs
+- **Includes**: Architecture diagrams, API specs, user guides, ADRs, cost analysis
 
 ---
 
@@ -492,75 +523,103 @@ npm test -- --watch
 
 **Frontend - Flutter Application**:
 - **Framework**: Flutter 3.x+ (Dart)
-- **State Management**: Provider/Riverpod/Bloc (TBD)
-- **UI Components**: Material Design / Custom widgets
-- **Platforms**: iOS, Android, Web
+- **State Management**: Riverpod (compile-safe, modern)
+- **UI Components**: Material Design 3 / Custom widgets
+- **Platforms**: iOS, Android, Web (single codebase)
 
-**Backend Services**:
-- **Language**: Python (FastAPI) or Node.js (NestJS) - TBD
-- **API**: RESTful with potential GraphQL for complex queries
-- **Authentication**: JWT + SMS verification
-- **Real-time**: WebSockets for live messaging
+**Backend - Serverless (AWS Lambda)**:
+- **Language**: Node.js 20.x with TypeScript
+- **API**: RESTful API via AWS API Gateway
+- **Real-time**: AWS AppSync (GraphQL + WebSocket) or API Gateway WebSocket
+- **Authentication**: AWS Cognito + JWT + SMS verification (SNS)
+- **Functions**: Individual Lambda functions per endpoint
 
-**Database**:
-- **Primary DB**: PostgreSQL (relational data, user profiles, forums)
-- **Cache**: Redis (session management, message queuing)
-- **Search**: Elasticsearch (optional, for message search)
+**Database - Amazon DynamoDB**:
+- **Type**: NoSQL, serverless, fully managed
+- **Pricing**: On-demand (pay-per-request) - cost-effective for sporadic usage
+- **Tables**: Users, Classrooms, Messages, Forums, Photos, PhotoTags
+- **Why DynamoDB**: ~9x cheaper than RDS for low-traffic apps, true serverless
+
+**Storage & CDN**:
+- **Object Storage**: Amazon S3 (class photos, profile pictures, attachments)
+- **CDN**: Amazon CloudFront (global content delivery)
+- **Image Processing**: AWS Lambda with Sharp library
 
 **External Integrations**:
-- **SMS**: Twilio API
-- **Email**: SendGrid or AWS SES
-- **WhatsApp**: WhatsApp Business API
-- **AI/ML**: OpenAI API or custom models
+- **SMS**: AWS SNS (50-80% cheaper than Twilio for international)
+- **Email**: AWS SES ($0.10 per 1,000 emails)
+- **WhatsApp**: WhatsApp Business API (via Twilio or direct integration)
+- **AI/ML**: AWS Rekognition (photo face detection), AWS Comprehend (optional)
 
 **Infrastructure**:
-- **Hosting**: AWS/GCP/Azure (TBD)
-- **Containers**: Docker
-- **Orchestration**: Docker Compose (dev) / Kubernetes (prod, optional)
-- **Storage**: S3-compatible object storage (media files)
-- **CDN**: CloudFlare or cloud provider CDN
+- **Cloud Provider**: AWS (100% serverless architecture)
+- **Deployment**: Serverless Framework or AWS SAM
+- **IaC**: serverless.yml + CloudFormation
+- **Monitoring**: CloudWatch Logs, CloudWatch Metrics, X-Ray
+- **Secrets**: AWS Secrets Manager
 
 **CI/CD**:
 - **Version Control**: GitHub
 - **CI/CD**: GitHub Actions
-- **Testing**: Jest/Pytest (backend), Flutter test framework
-- **Deployment**: Automated deployment to staging/production
+- **Testing**: Jest (backend), Flutter test framework (frontend)
+- **Deployment**: Automated deployment to dev/staging/prod environments
+- **Rollback**: CloudFormation stack rollback
+
+**Cost Optimization**:
+- **Development**: ~$20-45/month (within AWS free tier mostly)
+- **Production (500 users)**: ~$110-335/month
+- **AWS Startup Credits**: $1,000 covers 10-12 months of operation
 
 ### Key Dependencies
 
 **Mobile (Flutter)**:
-1. **http/dio**: API communication
-2. **provider/riverpod**: State management
-3. **shared_preferences**: Local storage
-4. **firebase_messaging**: Push notifications (optional)
-5. **image_picker**: Media sharing
-6. **intl**: Internationalization
+1. **dio**: HTTP client for API communication
+2. **riverpod**: State management (compile-safe, modern)
+3. **flutter_secure_storage**: Secure token storage
+4. **cached_network_image**: Efficient image loading and caching
+5. **image_picker**: Photo upload (profile, tagging)
+6. **amplify_flutter**: AWS integration (Cognito, S3, AppSync)
+7. **intl**: Internationalization
 
-**Backend**:
-1. **Twilio SDK**: SMS sending and receiving
-2. **SendGrid/AWS SES**: Email services
-3. **WhatsApp Business API SDK**: WhatsApp integration
-4. **PostgreSQL driver**: Database connectivity
-5. **Redis client**: Caching and queuing
-6. **JWT library**: Token-based authentication
-7. **WebSocket library**: Real-time messaging
-8. **OpenAI SDK**: AI-powered features (optional)
+**Backend (Node.js/TypeScript)**:
+1. **AWS SDK v3**: AWS service integrations (SNS, SES, S3, DynamoDB)
+2. **@aws-sdk/client-dynamodb**: DynamoDB client
+3. **@aws-sdk/lib-dynamodb**: DynamoDB document client (easier API)
+4. **jsonwebtoken**: JWT token generation and validation
+5. **twilio**: WhatsApp Business API integration
+6. **sharp**: Image processing (resize, optimize)
+7. **@middy/core**: Lambda middleware framework
+8. **@aws-lambda-powertools/logger**: Structured logging
+
+**Infrastructure**:
+1. **Serverless Framework**: Lambda deployment and management
+2. **serverless-offline**: Local Lambda development
+3. **serverless-plugin-typescript**: TypeScript support
+4. **aws-sdk-mock**: Testing AWS services locally
 
 ### Known Issues and Limitations
 
 **Current Limitations** (to be resolved as project develops):
 - WhatsApp Business API requires approval and has rate limits
-- SMS costs accumulate with usage (budget consideration)
-- Email deliverability depends on domain reputation
+- Lambda cold starts (1-2 seconds) - mitigated with provisioned concurrency for critical functions
+- DynamoDB requires careful data modeling (no joins) - use single-table design patterns
 - Cross-channel identity mapping complexity
 - Real-time message synchronization across channels
 
 **Technical Considerations**:
-- Phone number verification costs (Twilio charges)
-- WhatsApp Business API has strict templates for initial contact
-- Email-to-WhatsApp formatting challenges
-- Media file size limits vary by channel
-- Need to handle message delivery failures gracefully
+- SMS costs: AWS SNS charges ~$0.008-0.04 per international SMS
+- WhatsApp Business API has strict templates for initial contact (24-hour session window)
+- Lambda concurrent execution limits (1,000 default, can request increase)
+- API Gateway timeout: 29 seconds max (Lambda max 15 minutes)
+- DynamoDB item size limit: 400KB max
+- S3 eventual consistency for new objects
+- Need to handle message delivery failures gracefully with retry logic
+
+**Cost Management**:
+- Monitor DynamoDB capacity units closely (can spike with traffic)
+- Use S3 lifecycle policies to archive old photos to Glacier
+- Implement CloudWatch alarms for unexpected cost increases
+- Consider Reserved Capacity for DynamoDB if usage becomes predictable
 
 ### Project-Specific Security Requirements
 
@@ -578,22 +637,36 @@ npm test -- --watch
 8. **GDPR Compliance**: User data export and deletion capabilities
 
 **Never Commit**:
-- Twilio API keys and Auth tokens
-- SendGrid API keys
-- WhatsApp Business API credentials
-- Database passwords
+- AWS Access Keys and Secret Keys
+- AWS Secrets Manager secret values
+- Twilio API keys (for WhatsApp)
 - JWT secret keys
-- Any user data or phone numbers
+- Any user data, phone numbers, or email addresses
+- `.env` files with sensitive values
+- CloudFormation stack outputs with sensitive data
+
+**Use AWS Secrets Manager for**:
+- JWT signing secrets
+- WhatsApp API credentials
+- Third-party API keys
+- Database connection strings (if any)
 
 ### Architecture Decisions
 
 **Architecture Decision Records (ADRs)** should be stored in `/docs/adr/`:
 
-- ADR-001: Cross-platform mobile framework selection (Flutter)
-- ADR-002: Multi-channel messaging architecture
-- ADR-003: User verification and approval workflow
-- ADR-004: Database choice for scalability
-- ADR-005: Real-time messaging implementation
+- ADR-001: Cross-platform mobile framework selection (Flutter) - ✅ Decided
+- ADR-002: Serverless architecture vs containers (Serverless) - ✅ Decided
+- ADR-003: Backend language selection (Node.js/TypeScript) - ✅ Decided
+- ADR-004: Database choice (DynamoDB over PostgreSQL) - ✅ Decided
+  - **Rationale**: Cost savings (9x cheaper), true serverless, perfect for sporadic usage
+- ADR-005: SMS provider (AWS SNS over Twilio) - ✅ Decided
+  - **Rationale**: 50-80% cheaper for international SMS (Hong Kong + worldwide)
+- ADR-006: Multi-channel messaging architecture
+- ADR-007: User verification and peer approval workflow
+- ADR-008: Photo tagging and recognition system
+- ADR-009: Multi-classroom tracking data model
+- ADR-010: Real-time messaging (AppSync vs WebSocket)
 
 ---
 
@@ -630,9 +703,17 @@ This document should be treated as living documentation:
 
 ### Last Updated By
 
-- **Date**: 2025-11-15
+- **Date**: 2025-11-16
 - **Updated By**: Claude (AI Assistant)
-- **Changes**: Updated with High School Classmates Connection Platform project details, tech stack, milestones, and security requirements
+- **Changes**:
+  - Finalized tech stack: Node.js (TypeScript), AWS Lambda, DynamoDB, AWS SNS/SES
+  - Updated architecture to serverless (Lambda functions instead of containers)
+  - Added photo tagging and recognition as Phase 3
+  - Added multi-classroom tracking (500 users across multiple classrooms)
+  - Updated cost analysis (DynamoDB 9x cheaper than PostgreSQL)
+  - Reorganized phases to include photo management
+  - Updated directory structure for serverless backend
+  - Added AWS-specific security and cost optimization notes
 
 ---
 

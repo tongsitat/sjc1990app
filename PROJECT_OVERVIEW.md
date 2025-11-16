@@ -30,6 +30,12 @@ High school classmates want to stay connected, but face several challenges:
 
 4. **Organizing Challenges**: Reunion organizer struggles to reach everyone effectively
 
+5. **Lost Connections & Forgotten Faces**: Classmates who haven't been in touch regularly have forgotten each other's faces and names
+   - After 30+ years, people don't recognize old classmates
+   - Can remember a face but forgotten the name (or vice versa)
+   - Don't know if the person who just joined is actually the old friend from grade 8
+   - No easy way to connect "then" and "now" personas
+
 ### User Personas
 
 **Persona 1: "The Social Media User" - Sarah**
@@ -56,30 +62,39 @@ High school classmates want to stay connected, but face several challenges:
 - Not interested in daily chatter
 - Wants to hear about reunions and major events
 
+**Persona 5: "The Forgotten Friend" - Jennifer**
+- Moved abroad right after graduation 35 years ago
+- Lost touch with most classmates
+- Remembers some names but can't match them to faces
+- Wants to reconnect but feels awkward not recognizing people
+- Would love to browse old class photos to jog her memory
+
 ---
 
 ## The Solution
 
 ### Core Value Proposition
 
-A **trusted, self-hosted communication platform** that:
+A **trusted, serverless communication platform** that:
 
 1. **Unifies Communication**: Bridges WhatsApp, SMS, email, and native app users
-2. **Respects Preferences**: Each user chooses their preferred communication channel
-3. **Ensures Trust**: Built and operated by a trusted classmate, not a corporation
-4. **Maintains Privacy**: Users control who sees their information
-5. **Enables Flexibility**: Supports both real-time and asynchronous communication
+2. **Reconnects Lost Friends**: Photo tagging system links old school photos to current profiles
+3. **Respects Preferences**: Each user chooses their preferred communication channel
+4. **Ensures Trust**: Built and operated by a trusted classmate, not a corporation
+5. **Maintains Privacy**: Users control who sees their information
+6. **Enables Flexibility**: Supports both real-time and asynchronous communication
+7. **Preserves History**: 500+ classmates across multiple classrooms over the years
 
 ### Key Features
 
 #### Phase 1: User Registration & Authentication
 
-**3-Step Onboarding Process**:
+**4-Step Onboarding Process**:
 
 1. **Step 1: Identity Verification**
    - User provides real name (as known in school)
    - Provides phone number
-   - Receives SMS verification code
+   - Receives SMS verification code (via AWS SNS)
    - Enters verification code to confirm identity
 
 2. **Step 2: Peer Approval**
@@ -88,7 +103,20 @@ A **trusted, self-hosted communication platform** that:
    - Approval confirms: "Yes, this person was in our class"
    - Prevents unauthorized access
 
-3. **Step 3: Preferences & Classification**
+3. **Step 3: Profile & Photos** (NEW!)
+   - **Upload Current Profile Picture**
+     - How you look today
+     - Required field
+   - **Browse Old Class Photos** (optional but encouraged)
+     - Admin-uploaded photos from school days
+     - Tag yourself in photos: "This is me!"
+     - System saves face position and creates link
+     - Helps others recognize you
+   - **Add Bio**
+     - Brief description (optional)
+     - Where you live now, what you do
+
+4. **Step 4: Preferences & Classroom Tracking**
    - **Communication Preferences**:
      - Primary channel: App / WhatsApp / Email / SMS
      - Frequency: Real-time / Daily digest / Weekly digest
@@ -96,11 +124,13 @@ A **trusted, self-hosted communication platform** that:
    - **Privacy Settings**:
      - Who can see phone number: Everyone / Friends only / Nobody
      - Who can see email: Everyone / Friends only / Nobody
+     - Who can see old tagged photos: Everyone / Friends only
      - Who can message directly: Everyone / Friends only
-   - **Class/House Identification**:
-     - Which graduating class (e.g., 1990)
-     - Which house/section (if applicable)
-     - School activities/clubs participated in
+   - **Classroom Identification** (Multi-selection):
+     - Which classrooms were you in? (e.g., Primary 4B 1985, Form 3A 1988)
+     - Select from dropdown organized by year
+     - Can select multiple (students moved between classrooms)
+     - System tracks who was in same classrooms
 
 #### Phase 2: Core Communication Features
 
@@ -134,6 +164,59 @@ A **trusted, self-hosted communication platform** that:
 - @mention users
 - Pin important messages
 - Search message history
+
+#### Phase 2B: Photo Management & Recognition System (NEW!)
+
+**The "Then and Now" Feature**: Connecting old school photos to current identities
+
+**Admin Features (Photo Upload)**:
+- Admin uploads old class photos (scanned from albums)
+- Tag photos with metadata:
+  - Year (e.g., 1985)
+  - Classroom (e.g., Primary 4B)
+  - Event (e.g., Sports Day, Graduation, Class Photo)
+  - Description
+- Photos stored in S3, served via CloudFront CDN
+- Organize photos by year, classroom, event
+
+**User Features (Photo Tagging)**:
+- Browse uploaded class photos
+- Tag yourself in photos:
+  - Click on a face → "This is me!"
+  - System saves face position (x, y, width, height)
+  - Creates link between photoId and userId
+- View photos you're tagged in
+- Others can verify tags (peer confirmation)
+
+**Discovery & Reconnection**:
+- **Profile View Shows**:
+  - Current profile picture (how they look now)
+  - Old tagged photos (how they looked then)
+  - Classroom history (which classes they were in)
+- **Shared Classroom Discovery**:
+  - User A remembers name "John Smith" but not the face
+  - Searches for "John Smith"
+  - System shows:
+    - John's current profile photo
+    - Old photos where John is tagged (Grade 8, Form 3, etc.)
+    - Shared classrooms: "You were both in Form 3A (1988)!"
+  - User A: "Oh yes! I remember now - he sat next to me!"
+- **Photo Gallery**:
+  - Browse all photos
+  - Filter by year, classroom, event
+  - See who's tagged in each photo
+  - Click on tagged person to view their profile
+
+**Future AI Enhancement (Phase 6)**:
+- AWS Rekognition for face detection
+- Suggest "Is this you?" for untagged faces
+- Face matching between old and current photos
+- Auto-link related photos
+
+**Privacy Controls**:
+- Users choose who can see their tagged photos (Everyone / Friends / Nobody)
+- Can remove tag if incorrectly tagged
+- Can hide specific photos from their profile
 
 #### Phase 3: Cross-Channel Communication Bridge (PRIORITY)
 
@@ -235,21 +318,28 @@ A **trusted, self-hosted communication platform** that:
 
 ## User Workflows
 
-### Workflow 1: New User Registration
+### Workflow 1: New User Registration (4-Step Process)
 
 ```
 1. User visits app/website or receives SMS invitation
 2. Clicks "Join Our Classmates Network"
 3. Enters real name and phone number
-4. Receives SMS verification code
+4. Receives SMS verification code (AWS SNS)
 5. Enters code to verify phone
 6. Registration pending approval
-7. System notifies existing members
+7. System notifies existing members (push notification + email)
 8. Existing member(s) approve new user
+   - "I confirm this is John Smith from our class"
 9. User receives approval notification
-10. User sets communication preferences
-11. User identifies class/house affiliation
-12. User can now access the platform
+10. User uploads current profile picture (required)
+11. User browses old class photos (optional)
+    - Tags themselves in photos: "This is me in Primary 4B!"
+    - System saves face position and creates link
+12. User adds bio (optional)
+13. User sets communication preferences (primary channel, frequency)
+14. User identifies classrooms they were in (multi-select)
+    - e.g., Primary 4B (1985), Form 3A (1988), Form 6B (1991)
+15. User can now access the platform
 ```
 
 ### Workflow 2: Cross-Channel 1:1 Messaging
@@ -290,6 +380,44 @@ User posts in "Golf Buddies" Forum:
 6. Thread visible to all members in their preferred format
 ```
 
+### Workflow 4: Photo Discovery & Reconnection (NEW!)
+
+```
+User A wants to reconnect with a classmate but can't remember their face:
+
+1. User A remembers name "Jennifer Lee" from Primary 4
+2. User A searches for "Jennifer" in the app
+3. System shows search results:
+   - Jennifer Lee's current profile
+   - Current photo (how she looks now)
+4. User A thinks: "Is this the Jennifer I remember?"
+5. User A clicks on Jennifer's profile
+6. Profile shows:
+   - Current photo
+   - **Old tagged photos** (Primary 4B 1985, Form 3A 1988)
+   - **Shared classrooms**: "You were both in Primary 4B (1985)!"
+   - Bio: "Living in London, working as architect"
+7. User A sees old photo from Primary 4B
+8. User A: "Oh yes! That's her! I remember now!"
+9. User A sends message: "Hi Jennifer! Do you remember me? We sat together in Primary 4!"
+10. Jennifer receives message (via her preferred channel - WhatsApp)
+11. Jennifer checks User A's profile (sees old photos)
+12. Jennifer: "Yes! I remember you! How have you been?"
+13. Reconnection successful!
+
+Alternative workflow - Browsing photos:
+
+1. User B browses "Photo Gallery"
+2. Filters to "1985" → "Primary 4B"
+3. Sees class photo from 1985
+4. 15 people are tagged in the photo
+5. User B clicks on a tagged face
+6. System shows: "This is David Wong"
+7. User B clicks to view David's full profile
+8. Discovers they were in 3 classes together
+9. Sends friend request or message
+```
+
 ---
 
 ## Technical Requirements
@@ -297,23 +425,30 @@ User posts in "Golf Buddies" Forum:
 ### Functional Requirements
 
 **Must Have (MVP)**:
-1. SMS-based phone verification
+1. SMS-based phone verification (AWS SNS)
 2. Peer approval system
 3. User preference management
-4. 1:1 cross-channel messaging (at least 2 channels)
-5. Basic forum/group messaging
-6. Message routing engine
-7. Mobile app (iOS and Android)
-8. Web interface
+4. Profile photo upload
+5. Classroom tracking (multi-classroom assignment)
+6. 1:1 messaging within app
+7. Basic forum/group messaging
+8. Mobile app (iOS and Android) + Web interface
 
 **Should Have (V1)**:
-1. All 4 channels supported (App, WhatsApp, Email, SMS)
-2. Multiple forums/interest groups
-3. Media sharing (photos)
-4. Message threading
-5. Search functionality
-6. User profile pages
+1. **Photo tagging system** (upload old photos, tag yourself)
+2. **Shared classroom discovery** (find who was in same class)
+3. Cross-channel messaging (at least 2 channels: App + Email)
+4. Message routing engine
+5. Multiple forums/interest groups
+6. Search functionality (users, messages)
 7. Admin dashboard
+
+**Nice to Have (V2)**:
+1. All 4 channels supported (App, WhatsApp, Email, SMS)
+2. AWS Rekognition for face detection
+3. Advanced photo features (face matching, suggestions)
+4. Event management and RSVP
+5. Analytics dashboard
 
 **Could Have (Future)**:
 1. AI-powered features
@@ -526,17 +661,37 @@ User posts in "Golf Buddies" Forum:
 - **Peer Approval**: Verification by existing members that a new user belongs
 - **Message Routing**: System that directs messages to user's preferred channel
 - **Digest**: Batched summary of messages sent periodically
+- **Photo Tagging**: User marks themselves in old class photos
+- **Classroom Tracking**: System records which classrooms a user was in over the years
+- **Shared Classroom Discovery**: Finding classmates who were in the same classroom
+- **Serverless**: Cloud architecture that auto-scales and charges only for actual usage
 
 ### References
 
-- WhatsApp Business API: https://developers.facebook.com/docs/whatsapp
-- Twilio SMS: https://www.twilio.com/docs/sms
-- SendGrid Email: https://docs.sendgrid.com/
-- Flutter Documentation: https://docs.flutter.dev/
-- GDPR Compliance: https://gdpr.eu/
+- **AWS Services**:
+  - AWS Lambda: https://aws.amazon.com/lambda/
+  - Amazon DynamoDB: https://aws.amazon.com/dynamodb/
+  - AWS SNS (SMS): https://aws.amazon.com/sns/
+  - AWS SES (Email): https://aws.amazon.com/ses/
+  - AWS Rekognition: https://aws.amazon.com/rekognition/
+  - Serverless Framework: https://www.serverless.com/
+- **Mobile & APIs**:
+  - Flutter Documentation: https://docs.flutter.dev/
+  - WhatsApp Business API: https://developers.facebook.com/docs/whatsapp
+  - Twilio (for WhatsApp): https://www.twilio.com/docs/whatsapp
+- **Compliance**:
+  - GDPR Compliance: https://gdpr.eu/
 
 ---
 
-**Document Version**: 1.0
-**Last Updated**: 2025-11-15
+**Document Version**: 2.0
+**Last Updated**: 2025-11-16
 **Author**: Claude (based on project requirements from tongsitat)
+**Major Changes in v2.0**:
+- Added photo tagging and recognition system (Phase 2B)
+- Updated registration from 3-step to 4-step process
+- Added multi-classroom tracking (500 users, multiple classrooms over years)
+- Updated tech stack to Node.js, AWS Lambda, DynamoDB, SNS/SES
+- Added new persona "The Forgotten Friend" (Jennifer)
+- Added Workflow 4: Photo Discovery & Reconnection
+- Reorganized functional requirements to prioritize photo features
