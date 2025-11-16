@@ -384,207 +384,352 @@ POST /webhooks/whatsapp/messages
 
 ### Database Schema (Amazon DynamoDB)
 
+**Design Philosophy**: Single-table design pattern for optimal performance and cost efficiency
+
 #### Core Tables
 
-**users**
-```sql
-CREATE TABLE users (
-    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-    phone_number VARCHAR(20) UNIQUE NOT NULL,
-    phone_verified BOOLEAN DEFAULT FALSE,
-    email VARCHAR(255) UNIQUE,
-    full_name VARCHAR(255) NOT NULL,
-    display_name VARCHAR(100),
-    status VARCHAR(20) DEFAULT 'pending', -- pending, approved, active, suspended
-    created_at TIMESTAMP DEFAULT NOW(),
-    updated_at TIMESTAMP DEFAULT NOW(),
-    last_seen_at TIMESTAMP
-);
+**Users Table**
+```javascript
+TableName: 'Users'
+PartitionKey: userId (String)
+GlobalSecondaryIndexes:
+  - GSI1: phoneNumber (String) - for phone lookup
+  - GSI2: email (String) - for email lookup
+  - GSI3: status (String) - for filtering by status
 
-CREATE INDEX idx_users_phone ON users(phone_number);
-CREATE INDEX idx_users_email ON users(email);
-CREATE INDEX idx_users_status ON users(status);
+Attributes:
+{
+  userId: "uuid-v4",
+  phoneNumber: "+85298765432",
+  phoneVerified: true,
+  email: "john@example.com",
+  fullName: "John Smith",
+  displayName: "John",
+  status: "active", // pending, approved, active, suspended
+  avatarUrl: "s3://bucket/avatars/uuid.jpg",
+  bio: "Living in London, architect",
+  createdAt: 1700000000000,
+  updatedAt: 1700000000000,
+  lastSeenAt: 1700000000000
+}
 ```
 
-**user_profiles**
-```sql
-CREATE TABLE user_profiles (
-    user_id UUID PRIMARY KEY REFERENCES users(id) ON DELETE CASCADE,
-    graduating_class INTEGER,
-    house_section VARCHAR(100),
-    school_activities TEXT[],
-    bio TEXT,
-    avatar_url VARCHAR(500),
-    privacy_phone VARCHAR(20) DEFAULT 'friends', -- everyone, friends, nobody
-    privacy_email VARCHAR(20) DEFAULT 'friends',
-    privacy_profile VARCHAR(20) DEFAULT 'everyone',
-    created_at TIMESTAMP DEFAULT NOW(),
-    updated_at TIMESTAMP DEFAULT NOW()
-);
+**UserPreferences Table**
+```javascript
+TableName: 'UserPreferences'
+PartitionKey: userId (String)
+
+Attributes:
+{
+  userId: "uuid-v4",
+  primaryChannel: "whatsapp", // app, whatsapp, email, sms
+  messageFrequency: "realtime", // realtime, daily, weekly
+  quietHoursStart: "22:00",
+  quietHoursEnd: "08:00",
+  timezone: "Asia/Hong_Kong",
+  language: "en",
+  privacyPhone: "friends", // everyone, friends, nobody
+  privacyEmail: "friends",
+  privacyPhotos: "everyone",
+  createdAt: 1700000000000,
+  updatedAt: 1700000000000
+}
 ```
 
-**user_preferences**
-```sql
-CREATE TABLE user_preferences (
-    user_id UUID PRIMARY KEY REFERENCES users(id) ON DELETE CASCADE,
-    primary_channel VARCHAR(20) NOT NULL, -- app, whatsapp, email, sms
-    message_frequency VARCHAR(20) DEFAULT 'realtime', -- realtime, daily, weekly
-    quiet_hours_start TIME,
-    quiet_hours_end TIME,
-    timezone VARCHAR(50) DEFAULT 'UTC',
-    language VARCHAR(10) DEFAULT 'en',
-    created_at TIMESTAMP DEFAULT NOW(),
-    updated_at TIMESTAMP DEFAULT NOW()
-);
+**Classrooms Table**
+```javascript
+TableName: 'Classrooms'
+PartitionKey: classroomId (String)
+SortKey: year (Number)
+GlobalSecondaryIndexes:
+  - GSI1: level#section (String) - for filtering by level
+
+Attributes:
+{
+  classroomId: "uuid-v4",
+  year: 1985,
+  level: "Primary 4",
+  section: "B",
+  fullName: "Primary 4B (1985)",
+  studentCount: 38,
+  createdAt: 1700000000000
+}
 ```
 
-**verification_codes**
-```sql
-CREATE TABLE verification_codes (
-    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-    phone_number VARCHAR(20) NOT NULL,
-    code VARCHAR(6) NOT NULL,
-    expires_at TIMESTAMP NOT NULL,
-    verified BOOLEAN DEFAULT FALSE,
-    attempts INTEGER DEFAULT 0,
-    created_at TIMESTAMP DEFAULT NOW()
-);
+**UserClassrooms Table** (Many-to-Many relationship)
+```javascript
+TableName: 'UserClassrooms'
+PartitionKey: userId (String)
+SortKey: classroomId (String)
+GlobalSecondaryIndexes:
+  - GSI1: classroomId (PK), userId (SK) - for reverse lookup
 
-CREATE INDEX idx_verification_phone ON verification_codes(phone_number);
-CREATE INDEX idx_verification_expires ON verification_codes(expires_at);
+Attributes:
+{
+  userId: "uuid-v4",
+  classroomId: "uuid-v4",
+  years: "1985-1986",
+  role: "student", // student, teacher
+  joinedAt: 1700000000000
+}
+
+// Query patterns:
+// 1. Get all classrooms for user: Query by userId
+// 2. Get all users in classroom: Query GSI1 by classroomId
+// 3. Find shared classrooms: Query both users, compare results
 ```
 
-**pending_approvals**
-```sql
-CREATE TABLE pending_approvals (
-    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-    user_id UUID REFERENCES users(id) ON DELETE CASCADE,
-    approved_by UUID REFERENCES users(id),
-    approved_at TIMESTAMP,
-    notes TEXT,
-    created_at TIMESTAMP DEFAULT NOW()
-);
+**VerificationCodes Table**
+```javascript
+TableName: 'VerificationCodes'
+PartitionKey: phoneNumber (String)
+SortKey: createdAt (Number)
+TTL: expiresAt (Number) // Auto-delete expired codes
 
-CREATE INDEX idx_pending_user ON pending_approvals(user_id);
+Attributes:
+{
+  phoneNumber: "+85298765432",
+  code: "123456",
+  createdAt: 1700000000000,
+  expiresAt: 1700000600000, // 10 minutes later
+  verified: false,
+  attempts: 0
+}
 ```
 
-**forums**
-```sql
-CREATE TABLE forums (
-    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-    name VARCHAR(255) NOT NULL,
-    description TEXT,
-    type VARCHAR(20) DEFAULT 'public', -- main, public, private
-    created_by UUID REFERENCES users(id),
-    avatar_url VARCHAR(500),
-    created_at TIMESTAMP DEFAULT NOW(),
-    updated_at TIMESTAMP DEFAULT NOW()
-);
+**PendingApprovals Table**
+```javascript
+TableName: 'PendingApprovals'
+PartitionKey: userId (String)
+SortKey: createdAt (Number)
 
-CREATE INDEX idx_forums_type ON forums(type);
+Attributes:
+{
+  userId: "uuid-v4",
+  approvedBy: "uuid-v4",
+  approvedAt: 1700000000000,
+  notes: "Confirmed - was in my class",
+  status: "pending", // pending, approved, rejected
+  createdAt: 1700000000000
+}
 ```
 
-**forum_members**
-```sql
-CREATE TABLE forum_members (
-    forum_id UUID REFERENCES forums(id) ON DELETE CASCADE,
-    user_id UUID REFERENCES users(id) ON DELETE CASCADE,
-    role VARCHAR(20) DEFAULT 'member', -- member, moderator, admin
-    joined_at TIMESTAMP DEFAULT NOW(),
-    last_read_at TIMESTAMP,
-    PRIMARY KEY (forum_id, user_id)
-);
+**Forums Table**
+```javascript
+TableName: 'Forums'
+PartitionKey: forumId (String)
+GlobalSecondaryIndexes:
+  - GSI1: type (String) - for filtering by forum type
 
-CREATE INDEX idx_forum_members_user ON forum_members(user_id);
+Attributes:
+{
+  forumId: "uuid-v4",
+  name: "Golf Buddies",
+  description: "For classmates who love golf",
+  type: "public", // main, public, private
+  createdBy: "uuid-v4",
+  avatarUrl: "s3://bucket/forum-avatars/uuid.jpg",
+  memberCount: 25,
+  createdAt: 1700000000000,
+  updatedAt: 1700000000000
+}
 ```
 
-**messages**
-```sql
-CREATE TABLE messages (
-    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-    sender_id UUID REFERENCES users(id),
-    recipient_id UUID REFERENCES users(id), -- NULL for forum messages
-    forum_id UUID REFERENCES forums(id), -- NULL for direct messages
-    parent_id UUID REFERENCES messages(id), -- for threading
-    content TEXT NOT NULL,
-    content_type VARCHAR(20) DEFAULT 'text', -- text, image, video, file
-    metadata JSONB, -- attachments, formatting, etc.
-    created_at TIMESTAMP DEFAULT NOW(),
-    edited_at TIMESTAMP,
-    deleted_at TIMESTAMP
-);
+**ForumMembers Table**
+```javascript
+TableName: 'ForumMembers'
+PartitionKey: forumId (String)
+SortKey: userId (String)
+GlobalSecondaryIndexes:
+  - GSI1: userId (PK), forumId (SK) - for user's forums
 
-CREATE INDEX idx_messages_sender ON messages(sender_id);
-CREATE INDEX idx_messages_recipient ON messages(recipient_id);
-CREATE INDEX idx_messages_forum ON messages(forum_id);
-CREATE INDEX idx_messages_created ON messages(created_at DESC);
+Attributes:
+{
+  forumId: "uuid-v4",
+  userId: "uuid-v4",
+  role: "member", // member, moderator, admin
+  joinedAt: 1700000000000,
+  lastReadAt: 1700000000000
+}
 ```
 
-**message_deliveries**
-```sql
-CREATE TABLE message_deliveries (
-    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-    message_id UUID REFERENCES messages(id) ON DELETE CASCADE,
-    recipient_id UUID REFERENCES users(id),
-    channel VARCHAR(20) NOT NULL, -- app, whatsapp, email, sms
-    status VARCHAR(20) DEFAULT 'pending', -- pending, sent, delivered, failed
-    external_id VARCHAR(255), -- ID from external service
-    attempts INTEGER DEFAULT 0,
-    last_attempt_at TIMESTAMP,
-    delivered_at TIMESTAMP,
-    read_at TIMESTAMP,
-    error_message TEXT,
-    created_at TIMESTAMP DEFAULT NOW()
-);
+**Messages Table**
+```javascript
+TableName: 'Messages'
+PartitionKey: conversationId (String) // forumId or "dm#{userId1}#{userId2}"
+SortKey: timestamp (Number)
+GlobalSecondaryIndexes:
+  - GSI1: senderId (PK), timestamp (SK) - for user's sent messages
+  - GSI2: recipientId (PK), timestamp (SK) - for user's received messages
 
-CREATE INDEX idx_deliveries_message ON message_deliveries(message_id);
-CREATE INDEX idx_deliveries_recipient ON message_deliveries(recipient_id);
-CREATE INDEX idx_deliveries_status ON message_deliveries(status);
+Attributes:
+{
+  messageId: "uuid-v4",
+  conversationId: "dm#uuid1#uuid2", // or forumId for forum messages
+  senderId: "uuid-v4",
+  recipientId: "uuid-v4", // null for forum messages
+  forumId: "uuid-v4", // null for DMs
+  parentId: "uuid-v4", // for threading
+  content: "Hello! How are you?",
+  contentType: "text", // text, image, video, file
+  metadata: {
+    attachments: ["s3://bucket/file.jpg"],
+    mentions: ["uuid-v4", "uuid-v4"]
+  },
+  timestamp: 1700000000000,
+  editedAt: null,
+  deletedAt: null
+}
 ```
 
-**channel_identities**
-```sql
-CREATE TABLE channel_identities (
-    user_id UUID REFERENCES users(id) ON DELETE CASCADE,
-    channel VARCHAR(20) NOT NULL, -- whatsapp, email, sms
-    channel_identifier VARCHAR(255) NOT NULL, -- phone number, email address
-    verified BOOLEAN DEFAULT FALSE,
-    primary_identity BOOLEAN DEFAULT FALSE,
-    created_at TIMESTAMP DEFAULT NOW(),
-    PRIMARY KEY (user_id, channel)
-);
+**MessageDeliveries Table**
+```javascript
+TableName: 'MessageDeliveries'
+PartitionKey: messageId (String)
+SortKey: recipientId#channel (String)
+GlobalSecondaryIndexes:
+  - GSI1: recipientId (PK), timestamp (SK) - for user's deliveries
+  - GSI2: status (PK), timestamp (SK) - for failed messages
 
-CREATE INDEX idx_channel_identities_channel ON channel_identities(channel, channel_identifier);
+Attributes:
+{
+  messageId: "uuid-v4",
+  recipientId: "uuid-v4",
+  channel: "whatsapp", // app, whatsapp, email, sms
+  status: "delivered", // pending, sent, delivered, failed, read
+  externalId: "whatsapp-msg-id-123",
+  attempts: 1,
+  lastAttemptAt: 1700000000000,
+  deliveredAt: 1700000050000,
+  readAt: 1700000100000,
+  errorMessage: null,
+  createdAt: 1700000000000
+}
 ```
 
-### Caching Strategy (Redis)
+**Photos Table** (NEW for photo tagging feature)
+```javascript
+TableName: 'Photos'
+PartitionKey: photoId (String)
+GlobalSecondaryIndexes:
+  - GSI1: year (Number), classroom (String) - for filtering
+  - GSI2: uploadedBy (PK), uploadDate (SK) - for user's uploads
 
-**Cache Keys**:
+Attributes:
+{
+  photoId: "uuid-v4",
+  uploadedBy: "uuid-v4",
+  year: 1985,
+  classroom: "Primary 4B",
+  event: "Sports Day",
+  description: "Annual Sports Day 1985",
+  s3Key: "photos/1985/sports-day-001.jpg",
+  s3Bucket: "classmates-photos",
+  cdnUrl: "https://cdn.example.com/photos/1985/sports-day-001.jpg",
+  width: 1920,
+  height: 1080,
+  tagCount: 12, // number of people tagged
+  uploadDate: 1700000000000,
+  createdAt: 1700000000000
+}
 ```
-user:{user_id} → User object (TTL: 15 minutes)
+
+**PhotoTags Table** (NEW for photo tagging feature)
+```javascript
+TableName: 'PhotoTags'
+PartitionKey: photoId (String)
+SortKey: userId (String)
+GlobalSecondaryIndexes:
+  - GSI1: userId (PK), photoId (SK) - for user's tagged photos
+
+Attributes:
+{
+  photoId: "uuid-v4",
+  userId: "uuid-v4",
+  taggedBy: "uuid-v4", // who created the tag (self or peer)
+  facePosition: {
+    x: 120,
+    y: 45,
+    width: 50,
+    height: 60
+  },
+  verified: true, // peer-verified tag
+  verifiedBy: ["uuid-v4", "uuid-v4"], // users who confirmed
+  taggedAt: 1700000000000,
+  createdAt: 1700000000000
+}
+
+// Query patterns:
+// 1. Get all tags in photo: Query by photoId
+// 2. Get all photos user is tagged in: Query GSI1 by userId
+// 3. Find classmates in same photo: Query photoId, compare userIds
+```
+
+**ChannelIdentities Table**
+```javascript
+TableName: 'ChannelIdentities'
+PartitionKey: userId (String)
+SortKey: channel (String)
+GlobalSecondaryIndexes:
+  - GSI1: channel#identifier (PK) - for reverse lookup
+
+Attributes:
+{
+  userId: "uuid-v4",
+  channel: "whatsapp",
+  channelIdentifier: "+85298765432",
+  verified: true,
+  primaryIdentity: true,
+  createdAt: 1700000000000
+}
+
+// Query patterns:
+// 1. Get all channels for user: Query by userId
+// 2. Find user by channel identifier: Query GSI1 by "whatsapp#+85298765432"
+```
+
+### DynamoDB Design Considerations
+
+**Cost Optimization**:
+- On-demand billing mode for unpredictable traffic
+- TTL for auto-expiring verification codes
+- Projected attributes in GSIs to minimize storage costs
+- Batch operations for bulk reads/writes
+
+**Performance**:
+- Single-digit millisecond latency for primary key queries
+- GSIs for common query patterns
+- Composite sort keys for range queries
+- DynamoDB Streams for triggering Lambda functions
+
+**Scalability**:
+- Auto-scales to handle traffic spikes
+- No need to provision capacity
+- Supports eventual consistency for reads (cheaper)
+- Strong consistency available when needed
+
+### Caching Strategy (Optional - DynamoDB DAX or ElastiCache)
+
+**Cache Keys** (if using ElastiCache Redis):
+```
+user:{userId} → User object (TTL: 15 minutes)
 user:phone:{phone} → User ID lookup (TTL: 1 hour)
 user:email:{email} → User ID lookup (TTL: 1 hour)
-forum:{forum_id} → Forum object (TTL: 30 minutes)
-forum:members:{forum_id} → Set of user IDs (TTL: 30 minutes)
-session:{session_id} → Session data (TTL: 24 hours)
-preferences:{user_id} → User preferences (TTL: 1 hour)
+forum:{forumId} → Forum object (TTL: 30 minutes)
+preferences:{userId} → User preferences (TTL: 1 hour)
 ```
 
-**Pub/Sub Channels**:
-```
-messages:new → New message notifications
-users:online → Online status updates
-typing:{conversation_id} → Typing indicators
-```
+**Note**: DynamoDB is already very fast, so caching may not be necessary initially. Consider adding later if needed.
 
-### File Storage (S3-compatible)
+### File Storage (Amazon S3)
 
 **Bucket Structure**:
 ```
-/avatars/{user_id}/{filename}
-/forum-avatars/{forum_id}/{filename}
-/attachments/{message_id}/{filename}
-/media/{year}/{month}/{filename}
+/avatars/{userId}/{filename}              # User profile pictures
+/forum-avatars/{forumId}/{filename}       # Forum avatars
+/attachments/{messageId}/{filename}       # Message attachments
+/photos/{year}/{event}/{filename}         # Class photos (NEW)
+/photos/thumbnails/{photoId}/{size}.jpg   # Photo thumbnails (NEW)
 ```
 
 **Access Control**:
@@ -840,29 +985,69 @@ Referrer-Policy: strict-origin-when-cross-origin
 
 ## Technology Decisions
 
-### Backend Language: Python (FastAPI) ✓
+### Backend Language: Node.js (TypeScript) ✅ DECIDED
 
 **Rationale**:
-- Excellent for AI/ML integration
-- FastAPI is modern, fast, and has great async support
-- Rich ecosystem for integrations
-- Easy to write and maintain
-- Great for solo developer
+- Developer familiarity (user preference)
+- Excellent async/await support for serverless
+- Rich npm ecosystem for AWS SDK and integrations
+- Great TypeScript support for type safety
+- Perfect for Lambda functions (fast cold starts)
+- Mature serverless framework support
 
-**Alternatives Considered**: Node.js (NestJS)
+**Alternatives Considered**: Python (FastAPI) - not chosen due to developer preference
 
-### Database: PostgreSQL ✓
+### Database: Amazon DynamoDB ✅ DECIDED
 
 **Rationale**:
-- Mature, reliable, ACID compliant
-- Excellent for relational data
-- JSON support (JSONB) for flexibility
-- Full-text search capabilities
-- Proven scalability
+- **9x cheaper** than PostgreSQL RDS (~$20-40/mo vs $90/mo)
+- True serverless - scales to zero when idle
+- Perfect for sporadic traffic patterns (reunion app)
+- Sub-10ms latency for queries
+- No server management required
+- DynamoDB Streams for event-driven architecture
+- On-demand billing ideal for unpredictable usage
+- AWS Startup Credits last 10-12 months vs <1 year for RDS
 
-**Alternatives Considered**: MongoDB
+**Alternatives Considered**: PostgreSQL (Aurora Serverless) - too expensive for this use case
 
-### Frontend: Flutter ✓
+### Architecture: Serverless (AWS Lambda) ✅ DECIDED
+
+**Rationale**:
+- User preference for serverless over containers
+- Pay only for what you use (cost-effective)
+- No server management overhead
+- Auto-scaling built-in
+- Perfect for solo developer
+- Integrates seamlessly with DynamoDB, S3, SNS, SES
+- Lower operational complexity
+
+**Alternatives Considered**: Docker containers with ECS - rejected per user preference
+
+### SMS Provider: AWS SNS ✅ DECIDED
+
+**Rationale**:
+- **50-80% cheaper** than Twilio for international SMS
+- Integrated with AWS ecosystem
+- Reliable for Hong Kong + worldwide destinations
+- ~$0.008-0.04 per SMS vs Twilio's ~$0.05-0.15
+- Direct Lambda integration
+- No third-party dependency
+
+**Alternatives Considered**: Twilio - too expensive for international SMS
+
+### Email Provider: AWS SES ✅ DECIDED
+
+**Rationale**:
+- $0.10 per 1,000 emails (very cost-effective)
+- Integrated with AWS
+- Easy Lambda integration
+- Reliable delivery
+- Inbound email support via S3
+
+**Alternatives Considered**: SendGrid - AWS SES more cost-effective and integrated
+
+### Frontend: Flutter ✅ DECIDED
 
 **Rationale**:
 - True cross-platform (iOS, Android, Web)
@@ -870,28 +1055,32 @@ Referrer-Policy: strict-origin-when-cross-origin
 - Excellent performance
 - Beautiful UI capabilities
 - Growing community
+- Dart language is straightforward
 
 **Alternatives Considered**: React Native, Native (Swift/Kotlin)
 
-### State Management: Riverpod ✓
+### State Management: Riverpod ✅ DECIDED
 
 **Rationale**:
 - Modern, compile-safe
 - Great developer experience
 - Good for complex state
 - Active community
+- Better than Provider for this scale
 
 **Alternatives Considered**: Bloc, Provider
 
-### Hosting: AWS ✓ (Initial Choice)
+### Hosting: AWS ✅ DECIDED
 
 **Rationale**:
-- Comprehensive services
-- Free tier for getting started
-- Mature marketplace
+- User preference for AWS
+- 100% serverless stack possible
+- $1,000 startup credits available
+- Comprehensive services (Lambda, DynamoDB, S3, SNS, SES, CloudFront)
 - Good documentation
+- Mature ecosystem
 
-**Alternatives Considered**: GCP, Azure, Digital Ocean
+**Alternatives Considered**: GCP - not chosen due to user AWS preference
 
 ---
 
@@ -943,10 +1132,10 @@ Referrer-Policy: strict-origin-when-cross-origin
 - SSL certificate expiration
 
 **Tools**:
-- Prometheus + Grafana (metrics)
-- ELK or Loki (logging)
-- Sentry (error tracking)
-- Uptime monitoring
+- AWS CloudWatch (metrics, logs, alarms)
+- AWS X-Ray (distributed tracing)
+- Sentry (error tracking, optional)
+- Uptime Robot or similar (uptime monitoring)
 
 ---
 
@@ -954,25 +1143,45 @@ Referrer-Policy: strict-origin-when-cross-origin
 
 **Potential Evolutions**:
 
-1. **Microservices Split**: As system grows, split into separate services
-   - Auth service
-   - User service
-   - Messaging service
-   - Integration services
+1. **Multi-Region Deployment**: For global expansion and disaster recovery
+   - DynamoDB Global Tables
+   - Multi-region Lambda deployments
+   - Route 53 for failover
 
 2. **Event Sourcing**: For better auditability and replay capabilities
+   - Full event log in DynamoDB
+   - Event replay for debugging
 
-3. **GraphQL**: If client needs become complex
+3. **GraphQL with AppSync**: If client needs become complex
+   - Real-time subscriptions built-in
+   - Optimized for mobile apps
 
-4. **Service Mesh**: For advanced microservices management (Istio)
+4. **Step Functions**: For complex workflows
+   - Multi-step approval processes
+   - Scheduled digest generation
 
-5. **Serverless Functions**: For event-driven workloads (Lambda)
+5. **ML/AI Enhancements**:
+   - AWS Rekognition for photo face detection
+   - AWS Comprehend for content moderation
+   - Personalized recommendations
 
-6. **Multi-Region**: For global expansion
+6. **Multi-Tenant Architecture**: Support other graduating classes
+   - Tenant isolation in DynamoDB
+   - Separate S3 prefixes per tenant
+   - Shared Lambda functions
 
 ---
 
-**Document Version**: 1.0
-**Last Updated**: 2025-11-15
+**Document Version**: 2.0
+**Last Updated**: 2025-11-16
 **Author**: Claude (AI Assistant)
-**Status**: Initial Architecture - Subject to Refinement
+**Status**: Serverless Architecture - Node.js + DynamoDB
+**Major Changes in v2.0**:
+- Complete redesign for AWS serverless architecture
+- Replaced PostgreSQL with DynamoDB schema (11 tables)
+- Updated from Python to Node.js (TypeScript)
+- Added photo tagging tables (Photos, PhotoTags, Classrooms, UserClassrooms)
+- Changed from containers to Lambda functions
+- Updated all integrations to AWS services (SNS, SES)
+- Added DynamoDB design considerations and query patterns
+- Updated technology decisions with cost rationale

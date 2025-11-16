@@ -4,9 +4,10 @@
 
 This roadmap outlines the development phases for the High School Classmates Connection Platform, from initial setup through production launch and beyond.
 
-**Estimated Timeline**: 6-12 months to MVP
+**Estimated Timeline**: 12 months to Production
 **Development Model**: Iterative, with regular releases
-**Priority**: Cross-channel communication is the core differentiator
+**Priority**: Photo tagging (Phase 2B) and cross-channel communication are the core differentiators
+**No Urgency**: Next major reunion is 5 years away (40th anniversary)
 
 ---
 
@@ -15,11 +16,12 @@ This roadmap outlines the development phases for the High School Classmates Conn
 1. [Phase 0: Foundation & Setup](#phase-0-foundation--setup)
 2. [Phase 1: Authentication & User Management](#phase-1-authentication--user-management)
 3. [Phase 2: Core In-App Communication](#phase-2-core-in-app-communication)
-4. [Phase 3: Cross-Channel Bridge - MVP](#phase-3-cross-channel-bridge---mvp)
-5. [Phase 4: Complete Cross-Channel Support](#phase-4-complete-cross-channel-support)
-6. [Phase 5: Advanced Features](#phase-5-advanced-features)
-7. [Phase 6: Scale & Optimize](#phase-6-scale--optimize)
-8. [Ongoing: Maintenance & Evolution](#ongoing-maintenance--evolution)
+4. [Phase 2B: Photo Management & Tagging](#phase-2b-photo-management--tagging) (NEW!)
+5. [Phase 3: Cross-Channel Bridge - MVP](#phase-3-cross-channel-bridge---mvp)
+6. [Phase 4: Complete Cross-Channel Support](#phase-4-complete-cross-channel-support)
+7. [Phase 5: Advanced Features](#phase-5-advanced-features)
+8. [Phase 6: Scale & Optimize](#phase-6-scale--optimize)
+9. [Ongoing: Maintenance & Evolution](#ongoing-maintenance--evolution)
 
 ---
 
@@ -42,24 +44,27 @@ This roadmap outlines the development phases for the High School Classmates Conn
 
 #### 0.2 Development Environment
 - [ ] Install Flutter SDK and configure
-- [ ] Install Python 3.11+ and FastAPI
-- [ ] Set up PostgreSQL locally (Docker)
-- [ ] Set up Redis locally (Docker)
-- [ ] Create Docker Compose for local development
+- [ ] Install Node.js 20.x+ and configure
+- [ ] Install Serverless Framework CLI
+- [ ] Set up AWS CLI and credentials
+- [ ] Install DynamoDB Local (for local development)
 - [ ] Configure IDE/editor (VS Code with extensions)
-- [ ] Set up code formatters and linters
+- [ ] Set up code formatters and linters (ESLint, Prettier for TS)
 
 #### 0.3 External Service Accounts
 - [ ] Register domain name
-- [ ] Create Twilio account (trial)
-- [ ] Create SendGrid account (free tier)
-- [ ] Apply for WhatsApp Business API (start process)
-- [ ] Set up AWS/GCP account (free tier)
-- [ ] Configure DNS and email records
+- [ ] Create AWS account (apply for startup credits - $1,000)
+- [ ] Set up AWS SNS for SMS
+- [ ] Set up AWS SES for email (verify domain)
+- [ ] Apply for WhatsApp Business API (start process early - takes time)
+- [ ] Configure Route 53 for DNS
+- [ ] Set up CloudFront distribution
 
 #### 0.4 Repository Structure
 - [ ] Create `/mobile` directory with Flutter skeleton
-- [ ] Create `/backend` directory with FastAPI skeleton
+- [ ] Create `/backend` directory with serverless.yml
+- [ ] Create `/backend/functions` for Lambda handlers
+- [ ] Create `/backend/shared` for common utilities
 - [ ] Create `/docs` directory
 - [ ] Create `/infrastructure` directory for IaC
 - [ ] Create `/scripts` directory for utilities
