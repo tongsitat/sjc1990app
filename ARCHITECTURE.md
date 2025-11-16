@@ -20,65 +20,64 @@ This document describes the technical architecture for the High School Classmate
 
 ## System Architecture
 
-### High-Level Architecture
+### High-Level Architecture (Serverless)
 
 ```
-┌─────────────────────────────────────────────────────────────────┐
-│                         Client Layer                             │
-├─────────────────────────────────────────────────────────────────┤
-│  Flutter App    │   Web App   │   Email   │   SMS   │ WhatsApp  │
-│  (iOS/Android)  │  (Browser)  │  Clients  │ Devices │   App     │
-└────────┬────────┴──────┬──────┴─────┬─────┴────┬────┴─────┬─────┘
-         │               │            │          │          │
-         └───────────────┴────────────┴──────────┴──────────┘
+┌──────────────────────────────────────────────────────────────────┐
+│                         Client Layer                              │
+├──────────────────────────────────────────────────────────────────┤
+│  Flutter App    │   Web App   │   Email   │   SMS   │  WhatsApp  │
+│  (iOS/Android)  │  (Browser)  │  Clients  │ Devices │    App     │
+└────────┬────────┴──────┬──────┴─────┬─────┴────┬────┴──────┬─────┘
+         │               │            │          │           │
+         └───────────────┴────────────┴──────────┴───────────┘
                                 │
-                    ┌───────────▼──────────┐
-                    │   API Gateway /      │
-                    │   Load Balancer      │
-                    └───────────┬──────────┘
+                    ┌───────────▼──────────────┐
+                    │   AWS API Gateway        │
+                    │   (REST + WebSocket)     │
+                    └───────────┬──────────────┘
                                 │
-         ┌──────────────────────┼──────────────────────┐
-         │                      │                      │
-    ┌────▼─────┐         ┌─────▼─────┐        ┌──────▼──────┐
-    │   Auth   │         │    API    │        │  WebSocket  │
-    │ Service  │         │  Service  │        │   Server    │
-    └────┬─────┘         └─────┬─────┘        └──────┬──────┘
-         │                     │                      │
-         └──────────┬──────────┴──────────┬───────────┘
+         ┌──────────────────────┼───────────────────────┐
+         │                      │                       │
+    ┌────▼─────────┐    ┌──────▼────────┐     ┌───────▼─────────┐
+    │  Auth Lambda │    │  API Lambdas  │     │ WebSocket Lambda│
+    │  Functions   │    │  Functions    │     │   (AppSync)     │
+    └────┬─────────┘    └──────┬────────┘     └───────┬─────────┘
+         │                     │                       │
+         └──────────┬──────────┴──────────┬────────────┘
                     │                     │
-         ┌──────────▼──────────┐  ┌───────▼────────┐
-         │  Message Routing    │  │   Database     │
-         │     Engine          │  │  (PostgreSQL)  │
-         └──────────┬──────────┘  └───────┬────────┘
+         ┌──────────▼──────────┐  ┌───────▼────────────┐
+         │ Routing Lambda      │  │   Amazon DynamoDB  │
+         │ (Message Engine)    │  │   (NoSQL Database) │
+         └──────────┬──────────┘  └───────┬────────────┘
                     │                     │
-         ┌──────────┴──────────┬──────────┴────────┐
-         │                     │                   │
-    ┌────▼─────┐        ┌─────▼─────┐      ┌─────▼─────┐
-    │  Queue   │        │   Cache   │      │  Storage  │
-    │ (Redis)  │        │  (Redis)  │      │   (S3)    │
-    └────┬─────┘        └───────────┘      └───────────┘
+         ┌──────────┴──────────┬──────────┴───────────────┐
+         │                     │                          │
+    ┌────▼──────┐      ┌──────▼────┐           ┌─────────▼─────┐
+    │ SQS/SNS   │      │ DynamoDB  │           │   Amazon S3   │
+    │ (Queues)  │      │  Streams  │           │ (Photo Store) │
+    └────┬──────┘      └───────────┘           └───────────────┘
          │
-         └─────────────┬──────────────────────────┐
-                       │                          │
-              ┌────────▼────────┐      ┌─────────▼──────────┐
-              │   Integration   │      │    Integration     │
-              │     Services    │      │     Services       │
-              ├─────────────────┤      ├────────────────────┤
-              │  Twilio (SMS)   │      │  SendGrid (Email)  │
-              │  WhatsApp API   │      │                    │
-              └─────────────────┘      └────────────────────┘
+         └─────────────┬─────────────────────────────┐
+                       │                             │
+              ┌────────▼────────┐         ┌──────────▼──────────┐
+              │  AWS SNS (SMS)  │         │  AWS SES (Email)    │
+              │  WhatsApp API   │         │  S3 + CloudFront    │
+              │  (via Lambda)   │         │  (CDN)              │
+              └─────────────────┘         └─────────────────────┘
 ```
 
 ### Architecture Patterns
 
-**Primary Pattern**: **Microservices** (or modular monolith initially, evolving to microservices)
+**Primary Pattern**: **Serverless (FaaS - Function as a Service)**
 
 **Supporting Patterns**:
-- **Message Queue**: For asynchronous processing and reliability
+- **Event-Driven**: Lambda functions triggered by events (API Gateway, DynamoDB Streams, SQS)
+- **Microservices**: Each Lambda function is a micro-service
 - **API Gateway**: Single entry point for all client requests
-- **Event-Driven**: For cross-channel message routing
-- **CQRS (Light)**: Separate read/write paths for performance
-- **Circuit Breaker**: For external service resilience
+- **Message Queue**: SQS for asynchronous processing and reliability
+- **CQRS (Light)**: DynamoDB Streams for event sourcing
+- **Circuit Breaker**: Lambda retry policies and DLQ (Dead Letter Queue)
 
 ---
 
@@ -100,19 +99,22 @@ This document describes the technical architecture for the High School Classmate
 
 **Technology**:
 - Flutter 3.x+ (Dart)
-- State Management: Riverpod or Bloc
-- Local Storage: Hive or SQLite
+- State Management: Riverpod (compile-safe)
+- Local Storage: Hive or flutter_secure_storage
 - HTTP Client: Dio
-- WebSocket: web_socket_channel
+- WebSocket: AppSync or web_socket_channel
+- AWS Integration: amplify_flutter
 
 **Key Screens**:
 - Login/Registration
 - Verification (SMS code entry)
-- Preferences Setup
+- Profile & Photos Setup (NEW - upload profile, tag old photos)
+- Preferences & Classroom Selection
 - Main Feed/Forum
 - Direct Messages
 - Forum List
-- User Profile
+- Photo Gallery (NEW - browse and tag old class photos)
+- User Profile (with old tagged photos)
 - Settings
 
 #### Email Interface
@@ -121,7 +123,7 @@ This document describes the technical architecture for the High School Classmate
 
 **Implementation**:
 - Dedicated email addresses per user: `username@classmates.yourdomain.com`
-- Inbound email processing via webhooks (SendGrid, AWS SES)
+- Inbound email processing via AWS SES webhooks (to Lambda)
 - Outbound email with proper threading (Reply-To headers)
 - HTML emails with plain text fallback
 
@@ -136,10 +138,10 @@ This document describes the technical architecture for the High School Classmate
 **Purpose**: Basic notifications and replies for SMS-only users
 
 **Implementation**:
-- Twilio phone number(s)
+- AWS SNS for SMS (50-80% cheaper than Twilio for international)
 - Keyword-based commands (e.g., "REPLY 1: Your message")
 - Shortlinks for app downloads
-- Delivery receipts
+- Delivery status tracking via SNS callbacks to Lambda
 
 **Features**:
 - Important notifications only
@@ -164,13 +166,13 @@ This document describes the technical architecture for the High School Classmate
 
 ---
 
-### 2. Backend Services
+### 2. Backend Lambda Functions
 
-#### Authentication Service
+#### Authentication Functions
 
 **Responsibilities**:
 - User registration
-- SMS verification (via Twilio)
+- SMS verification (via AWS SNS)
 - JWT token generation and validation
 - Peer approval workflow
 - Session management
@@ -380,7 +382,7 @@ POST /webhooks/whatsapp/messages
 
 ## Data Architecture
 
-### Database Schema (PostgreSQL)
+### Database Schema (Amazon DynamoDB)
 
 #### Core Tables
 
