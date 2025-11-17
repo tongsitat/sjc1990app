@@ -1,0 +1,233 @@
+service: sjc1990app
+
+frameworkVersion: '3'
+
+provider:
+  name: aws
+  runtime: nodejs20.x
+  region: ${opt:region, 'us-east-1'}
+  stage: ${opt:stage, 'dev'}
+  memorySize: 256
+  timeout: 30
+
+  environment:
+    STAGE: ${self:provider.stage}
+    AWS_REGION: ${self:provider.region}
+    TABLE_USERS: ${self:service}-users-${self:provider.stage}
+    TABLE_VERIFICATION_CODES: ${self:service}-verification-codes-${self:provider.stage}
+    TABLE_PENDING_APPROVALS: ${self:service}-pending-approvals-${self:provider.stage}
+    TABLE_USER_PREFERENCES: ${self:service}-user-preferences-${self:provider.stage}
+    TABLE_CLASSROOMS: ${self:service}-classrooms-${self:provider.stage}
+    TABLE_USER_CLASSROOMS: ${self:service}-user-classrooms-${self:provider.stage}
+    JWT_SECRET: ${ssm:/${self:service}/${self:provider.stage}/jwt-secret~true}
+
+  iam:
+    role:
+      statements:
+        # DynamoDB permissions
+        - Effect: Allow
+          Action:
+            - dynamodb:Query
+            - dynamodb:GetItem
+            - dynamodb:PutItem
+            - dynamodb:UpdateItem
+            - dynamodb:DeleteItem
+          Resource:
+            - arn:aws:dynamodb:${self:provider.region}:*:table/${self:provider.environment.TABLE_USERS}
+            - arn:aws:dynamodb:${self:provider.region}:*:table/${self:provider.environment.TABLE_USERS}/index/*
+            - arn:aws:dynamodb:${self:provider.region}:*:table/${self:provider.environment.TABLE_VERIFICATION_CODES}
+            - arn:aws:dynamodb:${self:provider.region}:*:table/${self:provider.environment.TABLE_PENDING_APPROVALS}
+            - arn:aws:dynamodb:${self:provider.region}:*:table/${self:provider.environment.TABLE_PENDING_APPROVALS}/index/*
+            - arn:aws:dynamodb:${self:provider.region}:*:table/${self:provider.environment.TABLE_USER_PREFERENCES}
+            - arn:aws:dynamodb:${self:provider.region}:*:table/${self:provider.environment.TABLE_CLASSROOMS}
+            - arn:aws:dynamodb:${self:provider.region}:*:table/${self:provider.environment.TABLE_CLASSROOMS}/index/*
+            - arn:aws:dynamodb:${self:provider.region}:*:table/${self:provider.environment.TABLE_USER_CLASSROOMS}
+            - arn:aws:dynamodb:${self:provider.region}:*:table/${self:provider.environment.TABLE_USER_CLASSROOMS}/index/*
+
+        # SNS permissions for SMS
+        - Effect: Allow
+          Action:
+            - sns:Publish
+          Resource: '*'
+
+        # S3 permissions for profile photos
+        - Effect: Allow
+          Action:
+            - s3:PutObject
+            - s3:GetObject
+          Resource: arn:aws:s3:::${self:service}-${self:provider.stage}-photos/*
+
+functions:
+  # Authentication functions
+  authRegister:
+    handler: ../backend/functions/auth/register.handler
+    events:
+      - http:
+          path: /auth/register
+          method: post
+          cors: true
+
+  authVerify:
+    handler: ../backend/functions/auth/verify.handler
+    events:
+      - http:
+          path: /auth/verify
+          method: post
+          cors: true
+
+resources:
+  Resources:
+    # Users table
+    UsersTable:
+      Type: AWS::DynamoDB::Table
+      Properties:
+        TableName: ${self:provider.environment.TABLE_USERS}
+        BillingMode: PAY_PER_REQUEST
+        AttributeDefinitions:
+          - AttributeName: userId
+            AttributeType: S
+          - AttributeName: phoneNumberHash
+            AttributeType: S
+          - AttributeName: email
+            AttributeType: S
+          - AttributeName: status
+            AttributeType: S
+          - AttributeName: createdAt
+            AttributeType: N
+        KeySchema:
+          - AttributeName: userId
+            KeyType: HASH
+        GlobalSecondaryIndexes:
+          - IndexName: GSI1
+            KeySchema:
+              - AttributeName: phoneNumberHash
+                KeyType: HASH
+            Projection:
+              ProjectionType: ALL
+          - IndexName: GSI2
+            KeySchema:
+              - AttributeName: email
+                KeyType: HASH
+            Projection:
+              ProjectionType: ALL
+          - IndexName: GSI3
+            KeySchema:
+              - AttributeName: status
+                KeyType: HASH
+              - AttributeName: createdAt
+                KeyType: RANGE
+            Projection:
+              ProjectionType: ALL
+        PointInTimeRecoverySpecification:
+          PointInTimeRecoveryEnabled: true
+
+    # VerificationCodes table
+    VerificationCodesTable:
+      Type: AWS::DynamoDB::Table
+      Properties:
+        TableName: ${self:provider.environment.TABLE_VERIFICATION_CODES}
+        BillingMode: PAY_PER_REQUEST
+        AttributeDefinitions:
+          - AttributeName: phoneNumberHash
+            AttributeType: S
+        KeySchema:
+          - AttributeName: phoneNumberHash
+            KeyType: HASH
+        TimeToLiveSpecification:
+          AttributeName: expiresAt
+          Enabled: true
+
+    # PendingApprovals table
+    PendingApprovalsTable:
+      Type: AWS::DynamoDB::Table
+      Properties:
+        TableName: ${self:provider.environment.TABLE_PENDING_APPROVALS}
+        BillingMode: PAY_PER_REQUEST
+        AttributeDefinitions:
+          - AttributeName: userId
+            AttributeType: S
+          - AttributeName: status
+            AttributeType: S
+          - AttributeName: requestedAt
+            AttributeType: N
+        KeySchema:
+          - AttributeName: userId
+            KeyType: HASH
+        GlobalSecondaryIndexes:
+          - IndexName: GSI1
+            KeySchema:
+              - AttributeName: status
+                KeyType: HASH
+              - AttributeName: requestedAt
+                KeyType: RANGE
+            Projection:
+              ProjectionType: ALL
+
+    # UserPreferences table
+    UserPreferencesTable:
+      Type: AWS::DynamoDB::Table
+      Properties:
+        TableName: ${self:provider.environment.TABLE_USER_PREFERENCES}
+        BillingMode: PAY_PER_REQUEST
+        AttributeDefinitions:
+          - AttributeName: userId
+            AttributeType: S
+        KeySchema:
+          - AttributeName: userId
+            KeyType: HASH
+
+    # Classrooms table
+    ClassroomsTable:
+      Type: AWS::DynamoDB::Table
+      Properties:
+        TableName: ${self:provider.environment.TABLE_CLASSROOMS}
+        BillingMode: PAY_PER_REQUEST
+        AttributeDefinitions:
+          - AttributeName: classroomId
+            AttributeType: S
+          - AttributeName: year
+            AttributeType: N
+          - AttributeName: displayName
+            AttributeType: S
+        KeySchema:
+          - AttributeName: classroomId
+            KeyType: HASH
+        GlobalSecondaryIndexes:
+          - IndexName: GSI1
+            KeySchema:
+              - AttributeName: year
+                KeyType: HASH
+              - AttributeName: displayName
+                KeyType: RANGE
+            Projection:
+              ProjectionType: ALL
+
+    # UserClassrooms table (many-to-many)
+    UserClassroomsTable:
+      Type: AWS::DynamoDB::Table
+      Properties:
+        TableName: ${self:provider.environment.TABLE_USER_CLASSROOMS}
+        BillingMode: PAY_PER_REQUEST
+        AttributeDefinitions:
+          - AttributeName: userId
+            AttributeType: S
+          - AttributeName: classroomId
+            AttributeType: S
+        KeySchema:
+          - AttributeName: userId
+            KeyType: HASH
+          - AttributeName: classroomId
+            KeyType: RANGE
+        GlobalSecondaryIndexes:
+          - IndexName: GSI1
+            KeySchema:
+              - AttributeName: classroomId
+                KeyType: HASH
+              - AttributeName: userId
+                KeyType: RANGE
+            Projection:
+              ProjectionType: ALL
+
+plugins:
+  - serverless-offline
+  - serverless-plugin-typescript
