@@ -19,6 +19,8 @@ provider:
     TABLE_USER_PREFERENCES: ${self:service}-user-preferences-${self:provider.stage}
     TABLE_CLASSROOMS: ${self:service}-classrooms-${self:provider.stage}
     TABLE_USER_CLASSROOMS: ${self:service}-user-classrooms-${self:provider.stage}
+    S3_PHOTOS_BUCKET: ${self:service}-${self:provider.stage}-photos
+    CDN_BASE_URL: https://${self:service}-${self:provider.stage}-photos.s3.${self:provider.region}.amazonaws.com
     JWT_SECRET: ${ssm:/${self:service}/${self:provider.stage}/jwt-secret~true}
 
   iam:
@@ -55,7 +57,15 @@ provider:
           Action:
             - s3:PutObject
             - s3:GetObject
+            - s3:HeadObject
           Resource: arn:aws:s3:::${self:service}-${self:provider.stage}-photos/*
+
+        # DynamoDB Scan permission for list all classrooms
+        - Effect: Allow
+          Action:
+            - dynamodb:Scan
+          Resource:
+            - arn:aws:dynamodb:${self:provider.region}:*:table/${self:provider.environment.TABLE_CLASSROOMS}
 
 functions:
   # Authentication functions
@@ -73,6 +83,105 @@ functions:
       - http:
           path: /auth/verify
           method: post
+          cors: true
+
+  authPendingApprovals:
+    handler: ../backend/functions/auth/pending-approvals.handler
+    events:
+      - http:
+          path: /auth/pending-approvals
+          method: get
+          cors: true
+
+  authApprove:
+    handler: ../backend/functions/auth/approve.handler
+    events:
+      - http:
+          path: /auth/approve/{userId}
+          method: post
+          cors: true
+
+  authReject:
+    handler: ../backend/functions/auth/reject.handler
+    events:
+      - http:
+          path: /auth/reject/{userId}
+          method: post
+          cors: true
+
+  # User profile functions
+  updateProfile:
+    handler: ../backend/functions/users/update-profile.handler
+    events:
+      - http:
+          path: /users/{userId}/profile
+          method: put
+          cors: true
+
+  uploadPhoto:
+    handler: ../backend/functions/users/upload-photo.handler
+    events:
+      - http:
+          path: /users/{userId}/profile-photo
+          method: post
+          cors: true
+
+  completePhotoUpload:
+    handler: ../backend/functions/users/complete-photo-upload.handler
+    events:
+      - http:
+          path: /users/{userId}/profile-photo-complete
+          method: put
+          cors: true
+
+  # User preferences functions
+  getPreferences:
+    handler: ../backend/functions/users/get-preferences.handler
+    events:
+      - http:
+          path: /users/{userId}/preferences
+          method: get
+          cors: true
+
+  updatePreferences:
+    handler: ../backend/functions/users/update-preferences.handler
+    events:
+      - http:
+          path: /users/{userId}/preferences
+          method: put
+          cors: true
+
+  # Classroom functions
+  listClassrooms:
+    handler: ../backend/functions/classrooms/list-classrooms.handler
+    events:
+      - http:
+          path: /classrooms
+          method: get
+          cors: true
+
+  assignClassrooms:
+    handler: ../backend/functions/classrooms/assign-classrooms.handler
+    events:
+      - http:
+          path: /users/{userId}/classrooms
+          method: post
+          cors: true
+
+  getUserClassrooms:
+    handler: ../backend/functions/classrooms/get-user-classrooms.handler
+    events:
+      - http:
+          path: /users/{userId}/classrooms
+          method: get
+          cors: true
+
+  getClassroomMembers:
+    handler: ../backend/functions/classrooms/get-classroom-members.handler
+    events:
+      - http:
+          path: /classrooms/{classroomId}/members
+          method: get
           cors: true
 
 resources:
@@ -227,6 +336,29 @@ resources:
                 KeyType: RANGE
             Projection:
               ProjectionType: ALL
+
+    # S3 bucket for photos
+    PhotosBucket:
+      Type: AWS::S3::Bucket
+      Properties:
+        BucketName: ${self:provider.environment.S3_PHOTOS_BUCKET}
+        CorsConfiguration:
+          CorsRules:
+            - AllowedHeaders:
+                - '*'
+              AllowedMethods:
+                - GET
+                - PUT
+                - POST
+                - HEAD
+              AllowedOrigins:
+                - '*'
+              MaxAge: 3000
+        PublicAccessBlockConfiguration:
+          BlockPublicAcls: true
+          BlockPublicPolicy: true
+          IgnorePublicAcls: true
+          RestrictPublicBuckets: true
 
 plugins:
   - serverless-offline
