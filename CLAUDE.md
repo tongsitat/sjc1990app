@@ -4,7 +4,7 @@
 
 **Repository**: tongsitat/sjc1990app
 **Status**: Initial setup / Early development
-**Last Updated**: 2025-11-15
+**Last Updated**: 2025-11-17
 
 This document serves as a comprehensive guide for AI assistants (like Claude) working with this codebase. It contains essential information about the project structure, development workflows, coding conventions, and best practices.
 
@@ -14,12 +14,13 @@ This document serves as a comprehensive guide for AI assistants (like Claude) wo
 
 1. [Project Status](#project-status)
 2. [Codebase Structure](#codebase-structure)
-3. [Development Workflows](#development-workflows)
-4. [Coding Conventions](#coding-conventions)
-5. [AI Assistant Guidelines](#ai-assistant-guidelines)
-6. [Common Tasks](#common-tasks)
-7. [Testing Strategy](#testing-strategy)
-8. [Deployment](#deployment)
+3. [AI Team Structure](#ai-team-structure) **(NEW!)**
+4. [Development Workflows](#development-workflows)
+5. [Coding Conventions](#coding-conventions)
+6. [AI Assistant Guidelines](#ai-assistant-guidelines)
+7. [Common Tasks](#common-tasks)
+8. [Testing Strategy](#testing-strategy)
+9. [Deployment](#deployment)
 
 ---
 
@@ -190,6 +191,216 @@ sjc1990app/
 - **Purpose**: Comprehensive project documentation
 - **Conventions**: Markdown format, keep updated with code changes
 - **Includes**: Architecture diagrams, API specs, user guides, ADRs, cost analysis
+
+---
+
+## AI Team Structure
+
+### Overview
+
+This project uses a **multi-agent AI team approach** where specialized AI agents handle different aspects of development. As the Product Manager, you orchestrate these agents to build the platform efficiently.
+
+**Team Model**: 1 Product Manager (Human) + 7 AI Agents (Claude Code)
+
+### The AI Team
+
+| Role | Slash Command | Expertise | Primary Responsibilities |
+|------|---------------|-----------|--------------------------|
+| **Frontend Developer** | `/frontend-dev` | Flutter, Dart, Riverpod | Build screens, widgets, state management, API integration |
+| **Backend Developer** | `/backend-dev` | Node.js, TypeScript, Lambda, DynamoDB | Build Lambda functions, DynamoDB operations, AWS integrations |
+| **System Architect** | `/architect` | System design, data modeling, AWS architecture | Make architecture decisions, design schemas, write ADRs |
+| **DevOps Engineer** | `/devops` | CI/CD, deployments, infrastructure | Set up pipelines, deploy to AWS, monitor infrastructure |
+| **Functional QA** | `/qa-functional` | Testing, bug reporting | Test features, report bugs, verify user flows |
+| **Performance QA** | `/qa-performance` | Performance testing, cost optimization | Profile Lambdas, optimize costs, load testing |
+| **Project Manager** | `/pm` | Task coordination, progress tracking | Break down tasks, assign work, track progress |
+
+### How It Works
+
+1. **You (Product Manager)** define requirements and make final decisions
+2. **Project Manager Agent** (`/pm`) breaks down work into tasks
+3. **Specialized Agents** execute tasks in their domain
+4. **QA Agents** verify quality before deployment
+5. **DevOps Agent** deploys to AWS
+
+### Usage Examples
+
+#### Starting a New Feature
+
+```bash
+# As Product Manager, delegate to PM agent
+/pm "Plan the user registration feature for Phase 1.
+     Break down into tasks and assign to appropriate agents."
+
+# PM agent will then delegate to:
+# - /architect for schema design
+# - /backend-dev for Lambda functions
+# - /frontend-dev for UI screens
+# - /qa-functional for testing
+# - /devops for deployment
+```
+
+#### Direct Task Assignment
+
+```bash
+# Directly assign to specific agent
+/backend-dev "Implement POST /messages Lambda function.
+              Store messages in DynamoDB Messages table."
+
+/frontend-dev "Build the chat screen with message bubbles,
+               text input, and send button."
+
+/architect "Design the DynamoDB schema for photo tagging.
+            Users should be able to tag themselves and view tagged photos."
+```
+
+#### Quality Assurance
+
+```bash
+# Before committing code
+/qa-functional "Test the SMS verification flow.
+                Verify all edge cases."
+
+/qa-performance "Profile the POST /messages Lambda.
+                 Target: <300ms response time."
+```
+
+#### Infrastructure & Deployment
+
+```bash
+/devops "Set up GitHub Actions CI/CD pipeline.
+         Deploy to dev on merge to develop branch."
+
+/devops "Deploy the latest changes to staging environment."
+```
+
+### Agent Communication Flow
+
+```
+Product Manager (You)
+        ↓
+   Project Manager (/pm)
+        ↓
+   ┌────┴────┬─────────┬──────────┬──────────┐
+   ↓         ↓         ↓          ↓          ↓
+Architect  Backend  Frontend  DevOps     QA Agents
+        ↘      ↓         ↓          ↓      ↙
+              Code Review & Testing
+                      ↓
+              Production Deployment
+```
+
+### Agent Coordination Patterns
+
+#### Pattern 1: Full Feature Development
+
+```bash
+1. /pm "Plan user registration feature"
+   → Creates task breakdown
+
+2. /architect "Design Users DynamoDB schema"
+   → Updates ARCHITECTURE.md
+
+3. /backend-dev "Implement registration Lambda"
+   → Builds backend API
+
+4. /frontend-dev "Build registration screen"
+   → Builds UI
+
+5. /qa-functional "Test registration flow"
+   → Verifies functionality
+
+6. /qa-performance "Check Lambda performance"
+   → Optimizes if needed
+
+7. /devops "Deploy to dev environment"
+   → Deploys and monitors
+```
+
+#### Pattern 2: Architecture Decision
+
+```bash
+1. /architect "Should we use AppSync or API Gateway WebSocket
+               for real-time messaging?"
+   → Analyzes options, documents ADR
+
+2. Product Manager decides based on recommendation
+
+3. /architect "Update ARCHITECTURE.md with WebSocket decision"
+   → Documents final decision
+```
+
+#### Pattern 3: Bug Fix
+
+```bash
+1. /qa-functional "Reports: SMS verification code not working"
+
+2. /backend-dev "Debug SMS verification Lambda"
+   → Identifies and fixes bug
+
+3. /qa-functional "Verify SMS verification fix"
+   → Regression testing
+
+4. /devops "Deploy bug fix to production"
+   → Hot fix deployment
+```
+
+### Best Practices
+
+#### For Product Manager (You)
+
+✅ **DO**:
+- Start features with `/pm` for planning
+- Review agent recommendations before approval
+- Make final product decisions yourself
+- Escalate technical vs product trade-offs to appropriate agent
+
+❌ **DON'T**:
+- Micromanage implementation details (trust the agents)
+- Skip QA before deployment
+- Make architecture decisions without `/architect` input
+
+#### Agent Handoffs
+
+- **Architect → Backend**: Schema design → implementation
+- **Backend → Frontend**: API complete → UI integration
+- **Development → QA**: Code complete → testing
+- **QA → DevOps**: Tests pass → deployment
+
+### Documentation
+
+For detailed instructions on using each agent, see:
+- **Quick Start**: `/docs/AI_TEAM_GUIDE.md`
+- **Agent Definitions**: `/.claude/commands/*.md`
+
+Each agent's slash command file (`.claude/commands/`) contains:
+- Role definition and expertise
+- Responsibilities and constraints
+- Quality standards
+- Escalation guidelines
+- Example tasks
+
+### Productivity Benefits
+
+**Traditional Solo Development**:
+- 1 person switches between all roles
+- Context switching overhead
+- Harder to maintain quality standards
+
+**With AI Agent Team**:
+- Specialized focus per agent
+- Parallel task execution possible
+- Consistent quality standards per domain
+- Built-in code review (architecture, QA perspectives)
+- Automated task tracking (TodoWrite tool)
+
+### Next Steps
+
+1. Read `/docs/AI_TEAM_GUIDE.md` for detailed usage guide
+2. Try `/pm` to plan your first feature
+3. Use `/architect` to review architecture decisions
+4. Delegate implementation to `/backend-dev` and `/frontend-dev`
+5. Quality-check with `/qa-functional` and `/qa-performance`
+6. Deploy with `/devops`
 
 ---
 
