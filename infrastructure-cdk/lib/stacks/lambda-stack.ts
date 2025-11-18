@@ -55,9 +55,9 @@ export class LambdaStack extends cdk.Stack {
     );
 
     // Common environment variables for all Lambda functions
+    // Note: AWS_REGION is automatically provided by Lambda runtime
     const commonEnvironment = {
       STAGE: stage,
-      AWS_REGION: cdk.Stack.of(this).region,
       TABLE_USERS: tables.users.tableName,
       TABLE_VERIFICATION_CODES: tables.verificationCodes.tableName,
       TABLE_PENDING_APPROVALS: tables.pendingApprovals.tableName,
