@@ -91,33 +91,26 @@ aws ses list-verified-email-addresses --region us-west-2
 
 ### 5. Secrets Management
 
-- [ ] JWT secret generated (32-byte random hex)
-- [ ] JWT secret stored in AWS Systems Manager Parameter Store
-- [ ] Parameter path: `/sjc1990app/dev/jwt-secret`
-- [ ] Parameter type: `SecureString`
+- [ ] JWT secret generated (512-bit base64)
+- [ ] JWT secret stored in AWS Secrets Manager
+- [ ] Secret name: `sjc1990app/dev/jwt-secret` (no leading slash!)
 
-**Generate JWT Secret**:
+**Generate and Store JWT Secret**:
 ```bash
-node -e "console.log(require('crypto').randomBytes(32).toString('hex'))"
-# Copy this output!
-```
-
-**Store in Parameter Store**:
-```bash
-aws ssm put-parameter \
-  --name "/sjc1990app/dev/jwt-secret" \
-  --value "YOUR_GENERATED_SECRET_HERE" \
-  --type "SecureString" \
+# Generate secure 512-bit secret and store in Secrets Manager
+aws secretsmanager create-secret \
+  --name "sjc1990app/dev/jwt-secret" \
+  --description "JWT signing secret for sjc1990app dev environment" \
+  --secret-string "$(node -e "console.log(require('crypto').randomBytes(64).toString('base64'))")" \
   --region us-west-2
 ```
 
 **Verify**:
 ```bash
-aws ssm get-parameter \
-  --name "/sjc1990app/dev/jwt-secret" \
-  --with-decryption \
+aws secretsmanager describe-secret \
+  --secret-id "sjc1990app/dev/jwt-secret" \
   --region us-west-2
-# Should return your secret (encrypted)
+# Should return secret metadata
 ```
 
 ---
@@ -288,20 +281,24 @@ aws logs tail /aws/lambda/sjc1990app-dev-authRegister --follow --region us-west-
 # OR attach the custom deployment policy from AWS_SETUP.md
 ```
 
-### Issue: "JWT secret not found" in Lambda logs
+### Issue: "JWT secret not found" or "Secrets Manager can't find the specified secret"
 
-**Solution**: Secret not in Parameter Store
+**Solution**: Secret not created in Secrets Manager
 ```bash
 # Create the secret
-aws ssm put-parameter \
-  --name "/sjc1990app/dev/jwt-secret" \
-  --value "$(node -e "console.log(require('crypto').randomBytes(32).toString('hex'))")" \
-  --type "SecureString" \
+aws secretsmanager create-secret \
+  --name "sjc1990app/dev/jwt-secret" \
+  --description "JWT signing secret for sjc1990app dev environment" \
+  --secret-string "$(node -e "console.log(require('crypto').randomBytes(64).toString('base64'))")" \
   --region us-west-2
+
+# Delete failed stack if in ROLLBACK_COMPLETE state
+aws cloudformation delete-stack --stack-name sjc1990app-dev-lambda --region us-west-2
+aws cloudformation wait stack-delete-complete --stack-name sjc1990app-dev-lambda --region us-west-2
 
 # Redeploy Lambda stack
 cd ~/sjc1990app/infrastructure-cdk
-cdk deploy sjc1990app-dev-lambda --context stage=dev
+npm run deploy:dev
 ```
 
 ### Issue: TypeScript build fails

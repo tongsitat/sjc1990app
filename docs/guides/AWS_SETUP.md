@@ -468,44 +468,47 @@ node -e "console.log(require('crypto').randomBytes(32).toString('hex'))"
 
 **Save this output!** You'll need it in the next step.
 
-### Step 2: Store JWT Secret in AWS Systems Manager Parameter Store
+### Step 2: Store JWT Secret in AWS Secrets Manager
+
+**Note**: We use Secrets Manager instead of SSM Parameter Store because Lambda environment variables support Secrets Manager dynamic references via CloudFormation.
 
 ```bash
-# Replace YOUR_REGION and YOUR_SECRET with actual values
-aws ssm put-parameter \
-  --name "/sjc1990app/dev/jwt-secret" \
-  --value "5f8d3a9b2c1e4f7a6b9d8c3e5f7a2b4c6d8e9f1a3b5c7d9e2f4a6b8c1d3e5f7a9" \
-  --type "SecureString" \
-  --description "JWT secret for sjc1990app dev environment" \
+# Generate a secure random secret (512-bit)
+SECRET_VALUE=$(node -e "console.log(require('crypto').randomBytes(64).toString('base64'))")
+
+# Create the secret in Secrets Manager (no leading slash in name!)
+aws secretsmanager create-secret \
+  --name "sjc1990app/dev/jwt-secret" \
+  --description "JWT signing secret for sjc1990app dev environment" \
+  --secret-string "$SECRET_VALUE" \
   --region us-west-2
 ```
 
 **Verify it's stored**:
 ```bash
-aws ssm get-parameter \
-  --name "/sjc1990app/dev/jwt-secret" \
-  --with-decryption \
+aws secretsmanager describe-secret \
+  --secret-id "sjc1990app/dev/jwt-secret" \
   --region us-west-2
 ```
 
 **For staging and production environments**, repeat with different secrets:
 ```bash
 # Staging
-aws ssm put-parameter \
-  --name "/sjc1990app/staging/jwt-secret" \
-  --value "$(node -e "console.log(require('crypto').randomBytes(32).toString('hex'))")" \
-  --type "SecureString" \
+aws secretsmanager create-secret \
+  --name "sjc1990app/staging/jwt-secret" \
+  --description "JWT signing secret for sjc1990app staging environment" \
+  --secret-string "$(node -e "console.log(require('crypto').randomBytes(64).toString('base64'))")" \
   --region us-west-2
 
 # Production
-aws ssm put-parameter \
-  --name "/sjc1990app/prod/jwt-secret" \
-  --value "$(node -e "console.log(require('crypto').randomBytes(32).toString('hex'))")" \
-  --type "SecureString" \
+aws secretsmanager create-secret \
+  --name "sjc1990app/prod/jwt-secret" \
+  --description "JWT signing secret for sjc1990app production environment" \
+  --secret-string "$(node -e "console.log(require('crypto').randomBytes(64).toString('base64'))")" \
   --region us-west-2
 ```
 
-**Cost**: First 10,000 parameters free, then $0.05 per parameter/month
+**Cost**: $0.40 per secret/month + $0.05 per 10,000 API calls (first 30 days free for new secrets)
 
 ---
 
@@ -609,8 +612,8 @@ ls node_modules  # ✓ Should show many packages
 cd ~/sjc1990app/backend && npm run build  # ✓ No errors
 cd ~/sjc1990app/infrastructure-cdk && npm run build  # ✓ No errors
 
-# 7. JWT secret stored in Parameter Store
-aws ssm get-parameter --name "/sjc1990app/dev/jwt-secret" --with-decryption --region us-west-2  # ✓ Shows encrypted value
+# 7. JWT secret stored in Secrets Manager
+aws secretsmanager describe-secret --secret-id "sjc1990app/dev/jwt-secret" --region us-west-2  # ✓ Shows secret metadata
 
 # 8. SNS is accessible
 aws sns list-topics --region us-west-2  # ✓ Returns (may be empty)
@@ -780,23 +783,27 @@ export AWS_DEFAULT_REGION="us-west-2"
 
 ### Issue: JWT secret not found during Lambda execution
 
-**Error**: Lambda logs show "JWT secret not configured"
+**Error**: Lambda logs show "JWT secret not configured" or deployment fails with "Secrets Manager can't find the specified secret"
 
 **Solution**:
 ```bash
 # Verify secret exists
-aws ssm get-parameter --name "/sjc1990app/dev/jwt-secret" --region us-west-2
+aws secretsmanager describe-secret --secret-id "sjc1990app/dev/jwt-secret" --region us-west-2
 
 # If not found, create it:
-aws ssm put-parameter \
-  --name "/sjc1990app/dev/jwt-secret" \
-  --value "$(node -e "console.log(require('crypto').randomBytes(32).toString('hex'))")" \
-  --type "SecureString" \
+aws secretsmanager create-secret \
+  --name "sjc1990app/dev/jwt-secret" \
+  --description "JWT signing secret for sjc1990app dev environment" \
+  --secret-string "$(node -e "console.log(require('crypto').randomBytes(64).toString('base64'))")" \
   --region us-west-2
 
-# Redeploy Lambda functions
-cd ~/sjc1990app/infrastructure
-serverless deploy function -f authRegister --stage dev --region us-west-2
+# Delete failed CloudFormation stack if in ROLLBACK_COMPLETE state
+aws cloudformation delete-stack --stack-name sjc1990app-dev-lambda --region us-west-2
+aws cloudformation wait stack-delete-complete --stack-name sjc1990app-dev-lambda --region us-west-2
+
+# Redeploy Lambda stack
+cd ~/sjc1990app/infrastructure-cdk
+npm run deploy:dev
 ```
 
 ### Issue: DynamoDB table not found

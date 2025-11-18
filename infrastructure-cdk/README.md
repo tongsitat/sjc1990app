@@ -90,19 +90,18 @@ npm install
 
 ### 2. Configure JWT Secret
 
-Store JWT secret in AWS Systems Manager Parameter Store:
+Store JWT secret in AWS Secrets Manager (required before deployment):
 
 ```bash
-# Generate a secure random secret
-node -e "console.log(require('crypto').randomBytes(32).toString('hex'))"
-
-# Store in Parameter Store (replace YOUR_SECRET and REGION)
-aws ssm put-parameter \
-  --name "/sjc1990app/dev/jwt-secret" \
-  --value "YOUR_GENERATED_SECRET_HERE" \
-  --type "SecureString" \
+# Generate and store a secure 512-bit secret
+aws secretsmanager create-secret \
+  --name "sjc1990app/dev/jwt-secret" \
+  --description "JWT signing secret for sjc1990app dev environment" \
+  --secret-string "$(node -e "console.log(require('crypto').randomBytes(64).toString('base64'))")" \
   --region us-west-2
 ```
+
+**Note**: We use Secrets Manager instead of SSM Parameter Store because Lambda environment variables support Secrets Manager dynamic references via CloudFormation.
 
 ### 3. Bootstrap CDK (One-time per AWS account/region)
 
@@ -135,10 +134,10 @@ cdk deploy sjc1990app-dev-database --context stage=dev
 
 ```bash
 # First, create staging JWT secret
-aws ssm put-parameter \
-  --name "/sjc1990app/staging/jwt-secret" \
-  --value "DIFFERENT_SECRET_FOR_STAGING" \
-  --type "SecureString" \
+aws secretsmanager create-secret \
+  --name "sjc1990app/staging/jwt-secret" \
+  --description "JWT signing secret for sjc1990app staging environment" \
+  --secret-string "$(node -e "console.log(require('crypto').randomBytes(64).toString('base64'))")" \
   --region us-west-2
 
 # Deploy
@@ -149,10 +148,10 @@ npm run deploy:staging
 
 ```bash
 # Create production JWT secret
-aws ssm put-parameter \
-  --name "/sjc1990app/prod/jwt-secret" \
-  --value "DIFFERENT_SECRET_FOR_PROD" \
-  --type "SecureString" \
+aws secretsmanager create-secret \
+  --name "sjc1990app/prod/jwt-secret" \
+  --description "JWT signing secret for sjc1990app production environment" \
+  --secret-string "$(node -e "console.log(require('crypto').randomBytes(64).toString('base64'))")" \
   --region us-west-2
 
 # Deploy with manual approval
@@ -341,15 +340,19 @@ aws lambda get-policy \
 aws logs tail /aws/lambda/sjc1990app-dev-authRegister --follow
 ```
 
-### Issue: JWT secret not found
+### Issue: JWT secret not found / "Secrets Manager can't find the specified secret"
 
-**Solution**: Create secret in Parameter Store:
+**Solution**: Create secret in Secrets Manager:
 ```bash
-aws ssm put-parameter \
-  --name "/sjc1990app/dev/jwt-secret" \
-  --value "YOUR_SECRET" \
-  --type "SecureString" \
+aws secretsmanager create-secret \
+  --name "sjc1990app/dev/jwt-secret" \
+  --description "JWT signing secret for sjc1990app dev environment" \
+  --secret-string "$(node -e "console.log(require('crypto').randomBytes(64).toString('base64'))")" \
   --region us-west-2
+
+# If stack is in ROLLBACK_COMPLETE, delete it first:
+aws cloudformation delete-stack --stack-name sjc1990app-dev-lambda --region us-west-2
+aws cloudformation wait stack-delete-complete --stack-name sjc1990app-dev-lambda --region us-west-2
 ```
 
 ### Issue: S3 bucket name already taken
