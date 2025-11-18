@@ -13,7 +13,7 @@ This guide walks you through setting up your AWS account for the sjc1990app serv
 2. [AWS Account Setup](#aws-account-setup)
 3. [IAM User Creation](#iam-user-creation)
 4. [AWS CLI Installation & Configuration](#aws-cli-installation--configuration)
-5. [Serverless Framework Setup](#serverless-framework-setup)
+5. [AWS CDK Setup](#aws-cdk-setup)
 6. [AWS Services Configuration](#aws-services-configuration)
 7. [Secrets Management](#secrets-management)
 8. [Cost Monitoring Setup](#cost-monitoring-setup)
@@ -275,35 +275,36 @@ If successful, you're authenticated! ✅
 
 ---
 
-## Serverless Framework Setup
+## AWS CDK Setup
 
-### Step 1: Install Serverless Framework
+### Step 1: Install AWS CDK CLI
 
 ```bash
 # Install globally
-npm install -g serverless
+npm install -g aws-cdk
 
 # Verify installation
-serverless --version
-# Should show: Framework Core: 3.x.x or 4.x.x
+cdk --version
+# Should show: 2.x.x
 ```
 
-### Step 2: Configure Serverless with AWS Credentials
+### Step 2: Install CDK Project Dependencies
 
-The Serverless Framework will automatically use your AWS CLI credentials.
-
-**Test Serverless AWS connection**:
 ```bash
-cd /path/to/sjc1990app/infrastructure
-serverless info --stage dev
+# Install infrastructure dependencies
+cd ~/sjc1990app/infrastructure-cdk
+npm install
 
-# Should show: "Service not deployed" (expected - we haven't deployed yet)
+# This installs:
+# - aws-cdk-lib (CDK framework)
+# - constructs (CDK constructs library)
+# - TypeScript dependencies
 ```
 
-### Step 3: Install Project Dependencies
+### Step 3: Install Backend Dependencies
 
 ```bash
-# From project root
+# Install Lambda function dependencies
 cd ~/sjc1990app/backend
 npm install
 
@@ -317,10 +318,30 @@ npm install
 ### Step 4: Build TypeScript
 
 ```bash
+# Build backend Lambda functions
 cd ~/sjc1990app/backend
 npm run build
 
-# Should compile successfully with no errors
+# Build CDK infrastructure
+cd ~/sjc1990app/infrastructure-cdk
+npm run build
+
+# Both should compile successfully with no errors
+```
+
+### Step 5: Bootstrap CDK (One-time per AWS Account/Region)
+
+```bash
+# Replace ACCOUNT_ID with your AWS account ID
+# Get your account ID with: aws sts get-caller-identity --query Account --output text
+
+cdk bootstrap aws://ACCOUNT_ID/ap-southeast-1
+
+# Example:
+# cdk bootstrap aws://123456789012/ap-southeast-1
+
+# This creates a staging S3 bucket and IAM roles for CDK deployments
+# Only needs to be done once per AWS account/region combination
 ```
 
 ---
@@ -397,30 +418,38 @@ aws ses send-email \
 
 ### 3. Amazon S3 (Photo Storage)
 
-**No manual setup required!** The S3 bucket will be created automatically during Serverless deployment.
+**No manual setup required!** The S3 bucket will be created automatically during CDK deployment.
 
-**Optional: Set up S3 Lifecycle Policy** (After deployment):
+**Note**: The CDK infrastructure already includes lifecycle policies that automatically:
+- Archive photos to **Glacier Instant Retrieval** after 90 days
+- Archive photos to **Glacier Deep Archive** after 365 days (saves 95% on storage costs!)
+- Cleanup incomplete multipart uploads after 7 days
 
-1. Go to [S3 Console](https://console.aws.amazon.com/s3/)
-2. Find bucket: `sjc1990app-dev-photos`
-3. Click → **"Management"** tab → **"Create lifecycle rule"**
-4. Rule name: `archive-old-photos`
-5. Add rule:
-   - Transition to **Glacier Deep Archive** after 365 days
-   - (Saves 95% on storage costs for old photos)
-6. Apply to all objects
+No additional configuration needed! 🎉
 
 **Cost**: $0.023 per GB/month (first 50 TB)
 
 ### 4. Amazon DynamoDB
 
-**No manual setup required!** All tables will be created during Serverless deployment.
+**No manual setup required!** All 6 tables will be created automatically during CDK deployment.
 
-**Cost**: On-demand billing (pay-per-request), ~$1.85/month for 500 users
+The CDK infrastructure includes:
+- **6 DynamoDB tables** with proper schemas and GSIs
+- **On-demand billing** (pay-per-request)
+- **Encryption at rest** (AWS managed)
+- **Point-in-time recovery** for critical tables
+
+**Cost**: ~$1.85/month for 500 users
 
 ### 5. AWS Lambda
 
-**No manual setup required!** All Lambda functions will be deployed via Serverless Framework.
+**No manual setup required!** All 14 Lambda functions will be deployed via AWS CDK.
+
+The CDK infrastructure includes:
+- **Auto-bundling** of TypeScript functions
+- **Minification** and source maps
+- **Auto-generated IAM policies** (least privilege)
+- **Environment variables** from tables and secrets
 
 **Cost**: 1M requests/month free, then $0.20 per 1M requests
 
@@ -565,37 +594,47 @@ node --version  # ✓ v18.x or v20.x
 aws --version   # ✓ aws-cli/2.x.x
 aws sts get-caller-identity  # ✓ Shows your IAM user
 
-# 3. Serverless Framework installed
-serverless --version  # ✓ Framework Core: 3.x.x or 4.x.x
+# 3. AWS CDK installed
+cdk --version  # ✓ 2.x.x
 
-# 4. Backend dependencies installed
+# 4. CDK dependencies installed
+cd ~/sjc1990app/infrastructure-cdk
+ls node_modules  # ✓ Should show aws-cdk-lib, constructs, etc.
+
+# 5. Backend dependencies installed
 cd ~/sjc1990app/backend
 ls node_modules  # ✓ Should show many packages
 
-# 5. TypeScript compiles
-npm run build  # ✓ No errors
+# 6. TypeScript compiles (both backend and CDK)
+cd ~/sjc1990app/backend && npm run build  # ✓ No errors
+cd ~/sjc1990app/infrastructure-cdk && npm run build  # ✓ No errors
 
-# 6. JWT secret stored in Parameter Store
+# 7. JWT secret stored in Parameter Store
 aws ssm get-parameter --name "/sjc1990app/dev/jwt-secret" --with-decryption --region ap-southeast-1  # ✓ Shows encrypted value
 
-# 7. SNS is accessible
+# 8. SNS is accessible
 aws sns list-topics --region ap-southeast-1  # ✓ Returns (may be empty)
 
-# 8. SES is accessible
+# 9. SES is accessible
 aws ses list-verified-email-addresses --region ap-southeast-1  # ✓ Shows your verified email
 ```
 
-### Step 2: Test Serverless Deployment (Dry Run)
+### Step 2: Test CDK Deployment (Dry Run)
 
 ```bash
-cd ~/sjc1990app/infrastructure
+cd ~/sjc1990app/infrastructure-cdk
 
-# Package (validates serverless.yml without deploying)
-serverless package --stage dev --region ap-southeast-1
+# Synthesize CloudFormation templates (validates CDK code without deploying)
+cdk synth --context stage=dev
 
 # Should output:
-# ✓ Service packaged successfully
-# Creates .serverless/ folder with CloudFormation templates
+# ✓ CloudFormation templates generated successfully
+# Creates cdk.out/ folder with CloudFormation templates
+
+# View what will be deployed (diff against current state)
+cdk diff --context stage=dev
+
+# Should show all resources to be created (first time deployment)
 ```
 
 **If successful**, you're ready to deploy! 🎉
@@ -605,27 +644,24 @@ serverless package --stage dev --region ap-southeast-1
 **This is the real deployment! It will create all resources.**
 
 ```bash
-cd ~/sjc1990app/infrastructure
+cd ~/sjc1990app/infrastructure-cdk
 
-# Deploy to dev environment
-serverless deploy --stage dev --region ap-southeast-1 --verbose
+# Deploy all CDK stacks to dev environment
+cdk deploy --all --context stage=dev --region ap-southeast-1
 
 # Expected output:
-# - Creating CloudFormation stack...
-# - Creating DynamoDB tables (6 tables)...
-# - Creating S3 bucket...
-# - Creating Lambda functions (14 functions)...
-# - Creating API Gateway...
-# - Deployment successful!
+# ✔ sjc1990app-dev-storage (creating S3 bucket)
+# ✔ sjc1990app-dev-database (creating 6 DynamoDB tables)
+# ✔ sjc1990app-dev-lambda (creating 14 Lambda functions)
+# ✔ sjc1990app-dev-api (creating API Gateway)
 #
 # Estimated time: 3-5 minutes
 ```
 
 **Save the output!** It will show:
-- API Gateway endpoint URL (e.g., `https://abc123.execute-api.ap-southeast-1.amazonaws.com/dev`)
-- All deployed Lambda functions
-- DynamoDB table names
-- S3 bucket name
+- **ApiUrl** = `https://abc123.execute-api.ap-southeast-1.amazonaws.com/dev/` (API Gateway endpoint)
+- **Stack ARNs** for all 4 stacks
+- **Outputs** for table names, bucket names, function names
 
 ### Step 4: Test a Lambda Function
 
@@ -708,7 +744,7 @@ export AWS_SECRET_ACCESS_KEY="wJalrXUtnFEMI/..."
 export AWS_DEFAULT_REGION="ap-southeast-1"
 ```
 
-### Issue: Serverless deployment fails with "Access Denied"
+### Issue: CDK deployment fails with "Access Denied"
 
 **Error**: `User: arn:aws:iam::xxx:user/xxx is not authorized to perform: cloudformation:CreateStack`
 
@@ -716,6 +752,14 @@ export AWS_DEFAULT_REGION="ap-southeast-1"
 - Your IAM user needs more permissions
 - Add `AdministratorAccess` policy (for dev) or the custom policy above
 - Wait 1-2 minutes for IAM changes to propagate
+
+### Issue: CDK bootstrap fails
+
+**Error**: `❌ sjc1990app-dev-database failed: Error: Need to perform AWS calls for account 123456789012, but no credentials have been configured`
+
+**Solution**:
+- Run `cdk bootstrap` first (one-time setup)
+- Ensure AWS CLI is configured correctly (`aws sts get-caller-identity`)
 
 ### Issue: SNS SMS not sending
 
@@ -808,13 +852,13 @@ Once setup is complete, proceed to deployment:
 # Recommended workflow
 /devops "Deploy Phase 1 backend to AWS dev environment.
          All services are configured and ready.
-         Deploy serverless.yml to ap-southeast-1 region."
+         Use AWS CDK to deploy infrastructure."
 ```
 
 Or manual deployment:
 ```bash
-cd ~/sjc1990app/infrastructure
-serverless deploy --stage dev --region ap-southeast-1 --verbose
+cd ~/sjc1990app/infrastructure-cdk
+cdk deploy --all --context stage=dev --region ap-southeast-1
 ```
 
 ---
@@ -849,23 +893,29 @@ aws logs tail /aws/lambda/sjc1990app-dev-authRegister --follow --region ap-south
 aws logs describe-log-groups --region ap-southeast-1 | grep sjc1990app
 ```
 
-### Essential Serverless Commands
+### Essential CDK Commands
 
 ```bash
-# Deploy entire stack
-serverless deploy --stage dev --region ap-southeast-1
+# Synthesize CloudFormation templates (dry-run)
+cdk synth --context stage=dev
 
-# Deploy single function (faster)
-serverless deploy function -f authRegister --stage dev
+# View changes before deploying (diff)
+cdk diff --context stage=dev
 
-# View stack info
-serverless info --stage dev
+# Deploy all stacks
+cdk deploy --all --context stage=dev --region ap-southeast-1
 
-# View function logs
-serverless logs -f authRegister --stage dev --tail
+# Deploy specific stack
+cdk deploy sjc1990app-dev-lambda --context stage=dev
 
-# Remove entire stack (DELETE ALL RESOURCES!)
-serverless remove --stage dev --region ap-southeast-1
+# View deployed stack info
+aws cloudformation describe-stacks --stack-name sjc1990app-dev-api --region ap-southeast-1
+
+# View Lambda logs
+aws logs tail /aws/lambda/sjc1990app-dev-authRegister --follow --region ap-southeast-1
+
+# Destroy all stacks (DELETE ALL RESOURCES!)
+cdk destroy --all --context stage=dev --region ap-southeast-1
 ```
 
 ---
@@ -916,7 +966,9 @@ serverless remove --stage dev --region ap-southeast-1
 **Need Help?**
 - AWS Support: [https://console.aws.amazon.com/support/](https://console.aws.amazon.com/support/)
 - AWS Documentation: [https://docs.aws.amazon.com/](https://docs.aws.amazon.com/)
-- Serverless Framework Docs: [https://www.serverless.com/framework/docs](https://www.serverless.com/framework/docs)
+- AWS CDK Documentation: [https://docs.aws.amazon.com/cdk/](https://docs.aws.amazon.com/cdk/)
+- CDK Workshop: [https://cdkworkshop.com/](https://cdkworkshop.com/)
+- Infrastructure CDK README: [../infrastructure-cdk/README.md](../../infrastructure-cdk/README.md)
 - Project Issues: Ask me (Claude) or create GitHub issue
 
 **Ready to deploy?** See you in the next step! 🚀

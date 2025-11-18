@@ -1,6 +1,6 @@
 # Pre-Deployment Checklist for sjc1990app
 
-Use this checklist before running `serverless deploy` to ensure everything is configured correctly.
+Use this checklist before running `cdk deploy` to ensure everything is configured correctly.
 
 **Estimated Time**: 15-30 minutes (if following AWS_SETUP.md already)
 
@@ -38,19 +38,27 @@ aws configure list  # Should show your credentials (partially masked)
 
 ---
 
-### 3. Serverless Framework
+### 3. AWS CDK
 
-- [ ] Serverless Framework installed globally
-- [ ] Version 3.x or 4.x
+- [ ] AWS CDK CLI installed globally
+- [ ] Version 2.x
+- [ ] CDK dependencies installed (`npm install`)
 - [ ] Backend dependencies installed (`npm install`)
-- [ ] TypeScript builds without errors
+- [ ] TypeScript builds without errors (both backend and CDK)
+- [ ] CDK bootstrapped for your AWS account/region
 
 **Test**:
 ```bash
-serverless --version  # Should show: Framework Core: 3.x.x or 4.x.x
+cdk --version  # Should show: 2.x.x
+
+cd ~/sjc1990app/infrastructure-cdk
+npm run build  # Should compile successfully
 
 cd ~/sjc1990app/backend
-npm run build  # Should complete with no errors
+npm run build  # Should compile successfully
+
+# Bootstrap CDK (one-time per account/region)
+cdk bootstrap aws://ACCOUNT_ID/ap-southeast-1
 ```
 
 ---
@@ -132,18 +140,22 @@ aws ssm get-parameter \
 ### 7. Code & Configuration
 
 - [ ] All backend code committed to git
+- [ ] CDK infrastructure code committed to git
 - [ ] On correct branch: `claude/claude-md-mi0sf0rqjqh47l0w-01Ju3ppcLRM2eoLh5u7egn1e`
-- [ ] `serverless.yml` configured correctly
-- [ ] Environment variables set in `serverless.yml`
+- [ ] CDK stacks configured correctly
+- [ ] Environment variables accessible via Parameter Store
 
-**Verify serverless.yml**:
+**Verify CDK configuration**:
 ```bash
-cd ~/sjc1990app/infrastructure
+cd ~/sjc1990app/infrastructure-cdk
 
-# Check syntax (dry run)
-serverless package --stage dev --region ap-southeast-1
+# Synthesize CloudFormation templates (dry run)
+cdk synth --context stage=dev
 
-# Should output: "Service packaged successfully"
+# Should output: CloudFormation templates successfully generated
+
+# View what will be deployed
+cdk diff --context stage=dev
 ```
 
 ---
@@ -153,7 +165,7 @@ serverless package --stage dev --region ap-southeast-1
 - [ ] Region chosen based on your location/requirements
 - [ ] If using `ap-east-1` (Hong Kong), region is enabled in AWS Console
 - [ ] Region matches in all commands (`--region ap-southeast-1`)
-- [ ] Region set in serverless.yml matches AWS CLI region
+- [ ] Region set in CDK deployment matches AWS CLI region
 
 **Recommended Regions**:
 - `ap-southeast-1` - Singapore (most services, no opt-in)
@@ -169,10 +181,10 @@ If all checkboxes are ✅, you're ready to deploy!
 ### First Deployment (Dev Environment)
 
 ```bash
-cd ~/sjc1990app/infrastructure
+cd ~/sjc1990app/infrastructure-cdk
 
-# Deploy to dev environment
-serverless deploy --stage dev --region ap-southeast-1 --verbose
+# Deploy all CDK stacks to dev environment
+cdk deploy --all --context stage=dev --region ap-southeast-1
 
 # Deployment takes ~3-5 minutes
 # Watch for any errors during deployment
@@ -181,20 +193,19 @@ serverless deploy --stage dev --region ap-southeast-1 --verbose
 ### Expected Deployment Output
 
 ```
-✔ Service deployed to stack sjc1990app-dev
+✅ sjc1990app-dev-storage (S3 bucket created)
+✅ sjc1990app-dev-database (6 DynamoDB tables created)
+✅ sjc1990app-dev-lambda (14 Lambda functions created)
+✅ sjc1990app-dev-api (API Gateway created)
 
-endpoints:
-  POST - https://abc123def.execute-api.ap-southeast-1.amazonaws.com/dev/auth/register
-  POST - https://abc123def.execute-api.ap-southeast-1.amazonaws.com/dev/auth/verify
-  ... (12 more endpoints)
+Outputs:
+sjc1990app-dev-api.ApiUrl = https://abc123def.execute-api.ap-southeast-1.amazonaws.com/dev/
+sjc1990app-dev-database.UsersTableName = sjc1990app-users-dev
+sjc1990app-dev-storage.PhotosBucketName = sjc1990app-dev-photos
 
-functions:
-  authRegister: sjc1990app-dev-authRegister
-  authVerify: sjc1990app-dev-authVerify
-  ... (12 more functions)
-
-Stack Outputs:
-  ServerlessDeploymentBucketName: sjc1990app-dev-serverlessdeploymentbucket-xyz
+Stack ARNs:
+arn:aws:cloudformation:ap-southeast-1:123456789012:stack/sjc1990app-dev-api/...
+arn:aws:cloudformation:ap-southeast-1:123456789012:stack/sjc1990app-dev-database/...
 ```
 
 **SAVE THIS OUTPUT!** You'll need the API Gateway URL for testing.
@@ -262,9 +273,6 @@ curl -X POST "$API_URL/auth/register" \
 
 ```bash
 # Tail logs for registration function
-serverless logs -f authRegister --stage dev --tail
-
-# Or use AWS CLI
 aws logs tail /aws/lambda/sjc1990app-dev-authRegister --follow --region ap-southeast-1
 ```
 
@@ -291,8 +299,9 @@ aws ssm put-parameter \
   --type "SecureString" \
   --region ap-southeast-1
 
-# Redeploy Lambda function
-serverless deploy function -f authRegister --stage dev
+# Redeploy Lambda stack
+cd ~/sjc1990app/infrastructure-cdk
+cdk deploy sjc1990app-dev-lambda --context stage=dev
 ```
 
 ### Issue: TypeScript build fails
@@ -307,12 +316,13 @@ npm run build
 
 ### Issue: DynamoDB table already exists
 
-**Solution**: Remove old stack first
+**Solution**: Destroy old CDK stacks first
 ```bash
-serverless remove --stage dev --region ap-southeast-1
+cd ~/sjc1990app/infrastructure-cdk
+cdk destroy --all --context stage=dev --region ap-southeast-1
 
 # Then redeploy
-serverless deploy --stage dev --region ap-southeast-1
+cdk deploy --all --context stage=dev --region ap-southeast-1
 ```
 
 ---
@@ -360,6 +370,6 @@ If you encounter issues:
 **Ready?** Let's deploy! 🚀
 
 ```bash
-cd ~/sjc1990app/infrastructure
-serverless deploy --stage dev --region ap-southeast-1 --verbose
+cd ~/sjc1990app/infrastructure-cdk
+cdk deploy --all --context stage=dev --region ap-southeast-1
 ```
