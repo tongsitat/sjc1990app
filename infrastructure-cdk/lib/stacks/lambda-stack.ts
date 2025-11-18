@@ -3,7 +3,7 @@ import * as lambda from 'aws-cdk-lib/aws-lambda';
 import * as nodejs from 'aws-cdk-lib/aws-lambda-nodejs';
 import * as dynamodb from 'aws-cdk-lib/aws-dynamodb';
 import * as s3 from 'aws-cdk-lib/aws-s3';
-import * as ssm from 'aws-cdk-lib/aws-ssm';
+import * as secretsmanager from 'aws-cdk-lib/aws-secretsmanager';
 import * as iam from 'aws-cdk-lib/aws-iam';
 import { Construct } from 'constructs';
 import * as path from 'path';
@@ -45,13 +45,12 @@ export class LambdaStack extends cdk.Stack {
     const { stage, tables, photosBucket } = props;
     const serviceName = 'sjc1990app';
 
-    // Get JWT secret from Parameter Store
-    const jwtSecretParameter = ssm.StringParameter.fromSecureStringParameterAttributes(
+    // Get or create JWT secret from Secrets Manager
+    // Note: Secret must be created manually before deployment
+    const jwtSecret = secretsmanager.Secret.fromSecretNameV2(
       this,
       'JwtSecret',
-      {
-        parameterName: `/${serviceName}/${stage}/jwt-secret`,
-      }
+      `${serviceName}/${stage}/jwt-secret`
     );
 
     // Common environment variables for all Lambda functions
@@ -66,7 +65,7 @@ export class LambdaStack extends cdk.Stack {
       TABLE_USER_CLASSROOMS: tables.userClassrooms.tableName,
       S3_PHOTOS_BUCKET: photosBucket.bucketName,
       CDN_BASE_URL: `https://${photosBucket.bucketName}.s3.${cdk.Stack.of(this).region}.amazonaws.com`,
-      JWT_SECRET: jwtSecretParameter.stringValue,
+      JWT_SECRET: jwtSecret.secretValue.unsafeUnwrap(), // CloudFormation resolves this at runtime
     };
 
     // Common Lambda configuration
@@ -92,7 +91,7 @@ export class LambdaStack extends cdk.Stack {
       entry: string,
       description: string
     ): nodejs.NodejsFunction => {
-      return new nodejs.NodejsFunction(this, name, {
+      const fn = new nodejs.NodejsFunction(this, name, {
         ...commonLambdaProps,
         functionName: `${serviceName}-${stage}-${name}`,
         entry: path.join(__dirname, '../../../backend/functions', entry),
@@ -101,6 +100,11 @@ export class LambdaStack extends cdk.Stack {
         projectRoot, // Tell CDK to mount the project root directory
         depsLockFilePath: path.join(projectRoot, 'backend', 'package-lock.json'),
       });
+
+      // Grant read access to JWT secret
+      jwtSecret.grantRead(fn);
+
+      return fn;
     };
 
     // 1. Authentication Functions
