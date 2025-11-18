@@ -139,10 +139,14 @@ sjc1990app/
 │   │   └── middleware/      # Lambda middleware
 │   └── tests/                # Backend tests
 │
-├── infrastructure/            # Infrastructure as Code
-│   ├── serverless.yml        # Serverless Framework config
-│   ├── cloudformation/       # CloudFormation templates (optional)
-│   └── scripts/              # Deployment scripts
+├── infrastructure-cdk/        # Infrastructure as Code (AWS CDK)
+│   ├── bin/                  # CDK app entry point
+│   ├── lib/stacks/           # CDK stacks (Database, Lambda, API, Storage)
+│   ├── cdk.json              # CDK configuration
+│   └── package.json          # CDK dependencies
+│
+├── infrastructure/            # Legacy (archived)
+│   └── serverless.yml.archive # Original Serverless Framework config
 │
 ├── docs/                      # Documentation
 │   ├── architecture/         # System design diagrams
@@ -188,12 +192,14 @@ sjc1990app/
   - WhatsApp (Business API via Twilio or direct)
 - **Security**: All API keys in AWS Secrets Manager or environment variables
 
-#### `/infrastructure`
-- **Purpose**: Infrastructure as Code using Serverless Framework
+#### `/infrastructure-cdk`
+- **Purpose**: Infrastructure as Code using AWS CDK (TypeScript)
 - **Key Files**:
-  - `serverless.yml`: Main configuration for Lambda, API Gateway, DynamoDB
-  - CloudFormation templates for complex resources
-  - Deployment scripts
+  - `bin/infrastructure-cdk.ts`: CDK app entry point
+  - `lib/stacks/`: Database, Lambda, API Gateway, S3 stacks
+  - `cdk.json`: CDK configuration
+- **Deployment**: `cdk deploy --all` (see infrastructure-cdk/README.md)
+- **Migration**: Migrated from Serverless Framework (see ADR-011)
 
 #### `/docs`
 - **Purpose**: Comprehensive project documentation
@@ -776,10 +782,10 @@ npm test -- --watch
 
 **Infrastructure**:
 - **Cloud Provider**: AWS (100% serverless architecture)
-- **Deployment**: Serverless Framework or AWS SAM
-- **IaC**: serverless.yml + CloudFormation
+- **Deployment**: AWS CDK (TypeScript)
+- **IaC**: CDK stacks → CloudFormation (see infrastructure-cdk/)
 - **Monitoring**: CloudWatch Logs, CloudWatch Metrics, X-Ray
-- **Secrets**: AWS Secrets Manager
+- **Secrets**: AWS Systems Manager Parameter Store
 
 **CI/CD**:
 - **Version Control**: GitHub
@@ -815,10 +821,11 @@ npm test -- --watch
 8. **@aws-lambda-powertools/logger**: Structured logging
 
 **Infrastructure**:
-1. **Serverless Framework**: Lambda deployment and management
-2. **serverless-offline**: Local Lambda development
-3. **serverless-plugin-typescript**: TypeScript support
-4. **aws-sdk-mock**: Testing AWS services locally
+1. **AWS CDK (aws-cdk-lib)**: TypeScript Infrastructure as Code
+2. **aws-cdk/aws-lambda-nodejs**: Auto-bundling for Lambda functions
+3. **aws-cdk/aws-apigateway**: API Gateway REST API
+4. **aws-cdk/aws-dynamodb**: DynamoDB tables with type safety
+5. **constructs**: CDK constructs library
 
 ### Known Issues and Limitations
 
@@ -890,6 +897,8 @@ npm test -- --watch
 - ADR-008: Photo tagging and recognition system
 - ADR-009: Multi-classroom tracking data model
 - ADR-010: Real-time messaging (AppSync vs WebSocket)
+- ADR-011: Infrastructure deployment tool (AWS CDK over Serverless Framework) - ✅ Decided
+  - **Rationale**: TypeScript consistency, type safety, official AWS tool, better for complex features
 
 ---
 
@@ -927,16 +936,16 @@ This document should be treated as living documentation:
 ### Last Updated By
 
 - **Date**: 2025-11-18
-- **Updated By**: Claude (AI Assistant - Backend Developer Agent)
+- **Updated By**: Claude (AI Assistant - System Architect Agent)
 - **Changes**:
-  - ✅ Phase 1 Backend COMPLETE - All 14 Lambda functions implemented
-  - Added AWS Setup Guide (docs/guides/AWS_SETUP.md)
-  - Added Pre-Deployment Checklist (PRE_DEPLOYMENT_CHECKLIST.md)
-  - Updated project status: Ready for AWS deployment
-  - Updated key milestones: Phase 1 complete, Phase 2 (Frontend) next
-  - Added deployment guide references
-  - Backend includes: auth, approval system, profile, preferences, classrooms
-  - All code committed and pushed to feature branch
+  - ✅ Migrated infrastructure from Serverless Framework to AWS CDK (TypeScript)
+  - Created ADR-011 documenting infrastructure decision (AWS CDK vs Serverless)
+  - Created complete CDK infrastructure (4 stacks: Database, Lambda, API, Storage)
+  - Updated technology stack: AWS CDK for Infrastructure as Code
+  - Updated key dependencies: aws-cdk-lib, constructs, TypeScript IaC
+  - Updated directory structure: infrastructure-cdk/ with CDK stacks
+  - All CDK code ready for deployment
+  - Previous work: Phase 1 Backend complete (14 Lambda functions, 6 DynamoDB tables)
 
 ---
 
