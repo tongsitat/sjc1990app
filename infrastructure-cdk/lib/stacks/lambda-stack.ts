@@ -45,8 +45,8 @@ export class LambdaStack extends cdk.Stack {
     const { stage, tables, photosBucket } = props;
     const serviceName = 'sjc1990app';
 
-    // Get or create JWT secret from Secrets Manager
-    // Note: Secret must be created manually before deployment
+    // Get JWT secret from Secrets Manager
+    // Note: We store the secret NAME in env var, Lambda fetches value at runtime
     const jwtSecret = secretsmanager.Secret.fromSecretNameV2(
       this,
       'JwtSecret',
@@ -55,6 +55,7 @@ export class LambdaStack extends cdk.Stack {
 
     // Common environment variables for all Lambda functions
     // Note: AWS_REGION is automatically provided by Lambda runtime
+    // Note: JWT_SECRET_NAME stores the secret name, not the value (fetched at runtime)
     const commonEnvironment = {
       STAGE: stage,
       TABLE_USERS: tables.users.tableName,
@@ -65,7 +66,7 @@ export class LambdaStack extends cdk.Stack {
       TABLE_USER_CLASSROOMS: tables.userClassrooms.tableName,
       S3_PHOTOS_BUCKET: photosBucket.bucketName,
       CDN_BASE_URL: `https://${photosBucket.bucketName}.s3.${cdk.Stack.of(this).region}.amazonaws.com`,
-      JWT_SECRET: jwtSecret.secretValue.unsafeUnwrap(), // CloudFormation resolves this at runtime
+      JWT_SECRET_NAME: jwtSecret.secretName, // Lambda will fetch the actual value at runtime
     };
 
     // Common Lambda configuration

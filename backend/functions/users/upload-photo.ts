@@ -53,7 +53,7 @@ export async function handler(
 
     // Verify JWT token
     const token = extractTokenFromHeader(event.headers.Authorization);
-    const payload = verifyToken(token);
+    const payload = await verifyToken(token);
 
     // Verify user is uploading their own photo (or is admin)
     if (payload.userId !== userId && payload.role !== 'admin') {

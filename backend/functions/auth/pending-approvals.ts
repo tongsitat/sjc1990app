@@ -35,7 +35,7 @@ export async function handler(
 
     // Verify JWT token and check if user is admin
     const token = extractTokenFromHeader(event.headers.Authorization);
-    const payload = verifyToken(token);
+    const payload = await verifyToken(token);
 
     // TODO: Check if user is admin (for now, just verify token is valid)
     // In production, add role check: if (payload.role !== 'admin') return errors.forbidden();

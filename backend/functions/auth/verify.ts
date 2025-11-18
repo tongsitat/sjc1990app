@@ -163,7 +163,7 @@ export async function handler(
     logger.info('Pending approval created', { userId });
 
     // Generate JWT token
-    const token = generateToken({
+    const token = await generateToken({
       userId,
       phoneNumber: normalizedPhone,
       status: UserStatus.PENDING_APPROVAL,
