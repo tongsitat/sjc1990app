@@ -72,16 +72,4 @@ lambdaStack.addDependency(databaseStack);
 lambdaStack.addDependency(storageStack);
 apiStack.addDependency(lambdaStack);
 
-// Outputs
-new cdk.CfnOutput(app, 'ApiEndpoint', {
-  value: apiStack.apiUrl,
-  description: 'API Gateway endpoint URL',
-  exportName: `${stackPrefix}-api-url`,
-});
-
-new cdk.CfnOutput(app, 'Stage', {
-  value: stage,
-  description: 'Deployment stage',
-});
-
 app.synth();
