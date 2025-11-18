@@ -101,7 +101,7 @@ aws ssm put-parameter \
   --name "/sjc1990app/dev/jwt-secret" \
   --value "YOUR_GENERATED_SECRET_HERE" \
   --type "SecureString" \
-  --region ap-southeast-1
+  --region us-west-2
 ```
 
 ### 3. Bootstrap CDK (One-time per AWS account/region)
@@ -110,7 +110,7 @@ aws ssm put-parameter \
 cdk bootstrap aws://ACCOUNT_ID/REGION
 
 # Example:
-cdk bootstrap aws://123456789012/ap-southeast-1
+cdk bootstrap aws://123456789012/us-west-2
 ```
 
 ## Deployment
@@ -139,7 +139,7 @@ aws ssm put-parameter \
   --name "/sjc1990app/staging/jwt-secret" \
   --value "DIFFERENT_SECRET_FOR_STAGING" \
   --type "SecureString" \
-  --region ap-southeast-1
+  --region us-west-2
 
 # Deploy
 npm run deploy:staging
@@ -153,7 +153,7 @@ aws ssm put-parameter \
   --name "/sjc1990app/prod/jwt-secret" \
   --value "DIFFERENT_SECRET_FOR_PROD" \
   --type "SecureString" \
-  --region ap-southeast-1
+  --region us-west-2
 
 # Deploy with manual approval
 npm run deploy:prod
@@ -192,13 +192,13 @@ After successful deployment, you'll see:
 
 ```
 Outputs:
-sjc1990app-dev-api.ApiUrl = https://abc123.execute-api.ap-southeast-1.amazonaws.com/dev/
+sjc1990app-dev-api.ApiUrl = https://abc123.execute-api.us-west-2.amazonaws.com/dev/
 sjc1990app-dev-database.UsersTableName = sjc1990app-users-dev
 sjc1990app-dev-storage.PhotosBucketName = sjc1990app-dev-photos
 ...
 
 Stack ARN:
-arn:aws:cloudformation:ap-southeast-1:123456789012:stack/sjc1990app-dev-api/...
+arn:aws:cloudformation:us-west-2:123456789012:stack/sjc1990app-dev-api/...
 ```
 
 **Save the API URL!** You'll need it for frontend integration and testing.
@@ -209,7 +209,7 @@ arn:aws:cloudformation:ap-southeast-1:123456789012:stack/sjc1990app-dev-api/...
 
 ```bash
 # Get API URL from deployment output
-API_URL="https://abc123.execute-api.ap-southeast-1.amazonaws.com/dev"
+API_URL="https://abc123.execute-api.us-west-2.amazonaws.com/dev"
 
 # Test user registration
 curl -X POST "$API_URL/auth/register" \
@@ -230,7 +230,7 @@ curl -X POST "$API_URL/auth/register" \
 
 ```bash
 # Tail Lambda function logs
-aws logs tail /aws/lambda/sjc1990app-dev-authRegister --follow --region ap-southeast-1
+aws logs tail /aws/lambda/sjc1990app-dev-authRegister --follow --region us-west-2
 
 # Or use CDK helper (if available)
 cdk logs sjc1990app-dev-authRegister --follow
@@ -240,12 +240,12 @@ cdk logs sjc1990app-dev-authRegister --follow
 
 ```bash
 # List all tables
-aws dynamodb list-tables --region ap-southeast-1
+aws dynamodb list-tables --region us-west-2
 
 # Describe Users table
 aws dynamodb describe-table \
   --table-name sjc1990app-users-dev \
-  --region ap-southeast-1
+  --region us-west-2
 ```
 
 ## Cost Monitoring
@@ -307,7 +307,7 @@ jobs:
         with:
           aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
           aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
-          aws-region: ap-southeast-1
+          aws-region: us-west-2
 
       - name: Deploy CDK stacks
         run: |
@@ -331,7 +331,7 @@ jobs:
 ```bash
 aws lambda get-policy \
   --function-name sjc1990app-dev-authRegister \
-  --region ap-southeast-1
+  --region us-west-2
 ```
 
 ### Issue: API returns 502 Bad Gateway
@@ -349,7 +349,7 @@ aws ssm put-parameter \
   --name "/sjc1990app/dev/jwt-secret" \
   --value "YOUR_SECRET" \
   --type "SecureString" \
-  --region ap-southeast-1
+  --region us-west-2
 ```
 
 ### Issue: S3 bucket name already taken

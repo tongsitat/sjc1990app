@@ -10,7 +10,7 @@ const app = new cdk.App();
 
 // Get stage from context (default: dev)
 const stage = app.node.tryGetContext('stage') || 'dev';
-const region = app.node.tryGetContext('region') || 'ap-southeast-1';
+const region = app.node.tryGetContext('region') || 'us-west-2';
 
 // Stack naming
 const stackPrefix = `sjc1990app-${stage}`;

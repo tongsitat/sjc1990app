@@ -187,7 +187,7 @@ Create a custom policy with only required permissions:
 # Store in a password manager or secure notes
 Access Key ID: AKIAIOSFODNN7EXAMPLE
 Secret Access Key: wJalrXUtnFEMI/K7MDENG/bPxRfiCYEXAMPLEKEY
-Region: ap-southeast-1  # Hong Kong users: use ap-east-1
+Region: us-west-2  # Hong Kong users: use ap-east-1
 ```
 
 ---
@@ -236,7 +236,7 @@ Enter the following when prompted:
 ```
 AWS Access Key ID [None]: AKIAIOSFODNN7EXAMPLE  # Your Access Key
 AWS Secret Access Key [None]: wJalrXUtnFEMI/...  # Your Secret Key
-Default region name [None]: ap-southeast-1       # See region table below
+Default region name [None]: us-west-2       # See region table below
 Default output format [None]: json
 ```
 
@@ -244,7 +244,7 @@ Default output format [None]: json
 
 **Recommended regions for Hong Kong/Asia**:
 - `ap-east-1` - Hong Kong (lowest latency, but requires opt-in)
-- `ap-southeast-1` - Singapore (most services, no opt-in needed)
+- `us-west-2` - Singapore (most services, no opt-in needed)
 - `ap-northeast-1` - Tokyo
 - `us-east-1` - US East (Virginia) - cheapest, global testing
 
@@ -335,10 +335,10 @@ npm run build
 # Replace ACCOUNT_ID with your AWS account ID
 # Get your account ID with: aws sts get-caller-identity --query Account --output text
 
-cdk bootstrap aws://ACCOUNT_ID/ap-southeast-1
+cdk bootstrap aws://ACCOUNT_ID/us-west-2
 
 # Example:
-# cdk bootstrap aws://123456789012/ap-southeast-1
+# cdk bootstrap aws://123456789012/us-west-2
 
 # This creates a staging S3 bucket and IAM roles for CDK deployments
 # Only needs to be done once per AWS account/region combination
@@ -378,7 +378,7 @@ cdk bootstrap aws://ACCOUNT_ID/ap-southeast-1
 aws sns publish \
   --phone-number "+85291234567" \
   --message "Test from sjc1990app" \
-  --region ap-southeast-1
+  --region us-west-2
 ```
 
 **Cost**: ~$0.008-0.04 per SMS (varies by country)
@@ -411,7 +411,7 @@ aws ses send-email \
   --from "your-email@example.com" \
   --destination "ToAddresses=your-email@example.com" \
   --message "Subject={Data='Test',Charset=utf8},Body={Text={Data='Test from sjc1990app',Charset=utf8}}" \
-  --region ap-southeast-1
+  --region us-west-2
 ```
 
 **Cost**: $0.10 per 1,000 emails
@@ -477,7 +477,7 @@ aws ssm put-parameter \
   --value "5f8d3a9b2c1e4f7a6b9d8c3e5f7a2b4c6d8e9f1a3b5c7d9e2f4a6b8c1d3e5f7a9" \
   --type "SecureString" \
   --description "JWT secret for sjc1990app dev environment" \
-  --region ap-southeast-1
+  --region us-west-2
 ```
 
 **Verify it's stored**:
@@ -485,7 +485,7 @@ aws ssm put-parameter \
 aws ssm get-parameter \
   --name "/sjc1990app/dev/jwt-secret" \
   --with-decryption \
-  --region ap-southeast-1
+  --region us-west-2
 ```
 
 **For staging and production environments**, repeat with different secrets:
@@ -495,14 +495,14 @@ aws ssm put-parameter \
   --name "/sjc1990app/staging/jwt-secret" \
   --value "$(node -e "console.log(require('crypto').randomBytes(32).toString('hex'))")" \
   --type "SecureString" \
-  --region ap-southeast-1
+  --region us-west-2
 
 # Production
 aws ssm put-parameter \
   --name "/sjc1990app/prod/jwt-secret" \
   --value "$(node -e "console.log(require('crypto').randomBytes(32).toString('hex'))")" \
   --type "SecureString" \
-  --region ap-southeast-1
+  --region us-west-2
 ```
 
 **Cost**: First 10,000 parameters free, then $0.05 per parameter/month
@@ -610,13 +610,13 @@ cd ~/sjc1990app/backend && npm run build  # ✓ No errors
 cd ~/sjc1990app/infrastructure-cdk && npm run build  # ✓ No errors
 
 # 7. JWT secret stored in Parameter Store
-aws ssm get-parameter --name "/sjc1990app/dev/jwt-secret" --with-decryption --region ap-southeast-1  # ✓ Shows encrypted value
+aws ssm get-parameter --name "/sjc1990app/dev/jwt-secret" --with-decryption --region us-west-2  # ✓ Shows encrypted value
 
 # 8. SNS is accessible
-aws sns list-topics --region ap-southeast-1  # ✓ Returns (may be empty)
+aws sns list-topics --region us-west-2  # ✓ Returns (may be empty)
 
 # 9. SES is accessible
-aws ses list-verified-email-addresses --region ap-southeast-1  # ✓ Shows your verified email
+aws ses list-verified-email-addresses --region us-west-2  # ✓ Shows your verified email
 ```
 
 ### Step 2: Test CDK Deployment (Dry Run)
@@ -647,7 +647,7 @@ cdk diff --context stage=dev
 cd ~/sjc1990app/infrastructure-cdk
 
 # Deploy all CDK stacks to dev environment
-cdk deploy --all --context stage=dev --region ap-southeast-1
+cdk deploy --all --context stage=dev --region us-west-2
 
 # Expected output:
 # ✔ sjc1990app-dev-storage (creating S3 bucket)
@@ -659,7 +659,7 @@ cdk deploy --all --context stage=dev --region ap-southeast-1
 ```
 
 **Save the output!** It will show:
-- **ApiUrl** = `https://abc123.execute-api.ap-southeast-1.amazonaws.com/dev/` (API Gateway endpoint)
+- **ApiUrl** = `https://abc123.execute-api.us-west-2.amazonaws.com/dev/` (API Gateway endpoint)
 - **Stack ARNs** for all 4 stacks
 - **Outputs** for table names, bucket names, function names
 
@@ -671,7 +671,7 @@ For now, test user registration:
 
 ```bash
 # Get the API Gateway URL from deployment output
-API_URL="https://abc123.execute-api.ap-southeast-1.amazonaws.com/dev"
+API_URL="https://abc123.execute-api.us-west-2.amazonaws.com/dev"
 
 # Test registration endpoint
 curl -X POST "$API_URL/auth/register" \
@@ -694,7 +694,7 @@ curl -X POST "$API_URL/auth/register" \
 
 **Check DynamoDB Tables**:
 ```bash
-aws dynamodb list-tables --region ap-southeast-1
+aws dynamodb list-tables --region us-west-2
 
 # Should show 6 tables:
 # - sjc1990app-users-dev
@@ -707,7 +707,7 @@ aws dynamodb list-tables --region ap-southeast-1
 
 **Check Lambda Functions**:
 ```bash
-aws lambda list-functions --region ap-southeast-1 | grep sjc1990app
+aws lambda list-functions --region us-west-2 | grep sjc1990app
 
 # Should show 14 functions
 ```
@@ -741,7 +741,7 @@ aws configure
 # Or set environment variables
 export AWS_ACCESS_KEY_ID="AKIAIOSFODNN7EXAMPLE"
 export AWS_SECRET_ACCESS_KEY="wJalrXUtnFEMI/..."
-export AWS_DEFAULT_REGION="ap-southeast-1"
+export AWS_DEFAULT_REGION="us-west-2"
 ```
 
 ### Issue: CDK deployment fails with "Access Denied"
@@ -775,7 +775,7 @@ export AWS_DEFAULT_REGION="ap-southeast-1"
    ```
 5. Test SNS directly:
    ```bash
-   aws sns publish --phone-number "+85291234567" --message "Test" --region ap-southeast-1
+   aws sns publish --phone-number "+85291234567" --message "Test" --region us-west-2
    ```
 
 ### Issue: JWT secret not found during Lambda execution
@@ -785,18 +785,18 @@ export AWS_DEFAULT_REGION="ap-southeast-1"
 **Solution**:
 ```bash
 # Verify secret exists
-aws ssm get-parameter --name "/sjc1990app/dev/jwt-secret" --region ap-southeast-1
+aws ssm get-parameter --name "/sjc1990app/dev/jwt-secret" --region us-west-2
 
 # If not found, create it:
 aws ssm put-parameter \
   --name "/sjc1990app/dev/jwt-secret" \
   --value "$(node -e "console.log(require('crypto').randomBytes(32).toString('hex'))")" \
   --type "SecureString" \
-  --region ap-southeast-1
+  --region us-west-2
 
 # Redeploy Lambda functions
 cd ~/sjc1990app/infrastructure
-serverless deploy function -f authRegister --stage dev --region ap-southeast-1
+serverless deploy function -f authRegister --stage dev --region us-west-2
 ```
 
 ### Issue: DynamoDB table not found
@@ -806,11 +806,11 @@ serverless deploy function -f authRegister --stage dev --region ap-southeast-1
 **Solution**:
 ```bash
 # Check if tables exist
-aws dynamodb list-tables --region ap-southeast-1
+aws dynamodb list-tables --region us-west-2
 
 # If missing, redeploy
 cd ~/sjc1990app/infrastructure
-serverless deploy --stage dev --region ap-southeast-1
+serverless deploy --stage dev --region us-west-2
 ```
 
 ### Issue: Lambda cold start timeout
@@ -858,7 +858,7 @@ Once setup is complete, proceed to deployment:
 Or manual deployment:
 ```bash
 cd ~/sjc1990app/infrastructure-cdk
-cdk deploy --all --context stage=dev --region ap-southeast-1
+cdk deploy --all --context stage=dev --region us-west-2
 ```
 
 ---
@@ -878,19 +878,19 @@ aws ec2 describe-regions --output table
 aws configure list
 
 # List all DynamoDB tables
-aws dynamodb list-tables --region ap-southeast-1
+aws dynamodb list-tables --region us-west-2
 
 # List all Lambda functions
-aws lambda list-functions --region ap-southeast-1 --query 'Functions[*].[FunctionName]' --output table
+aws lambda list-functions --region us-west-2 --query 'Functions[*].[FunctionName]' --output table
 
 # List all S3 buckets
 aws s3 ls
 
 # Tail Lambda logs
-aws logs tail /aws/lambda/sjc1990app-dev-authRegister --follow --region ap-southeast-1
+aws logs tail /aws/lambda/sjc1990app-dev-authRegister --follow --region us-west-2
 
 # Get latest CloudWatch logs
-aws logs describe-log-groups --region ap-southeast-1 | grep sjc1990app
+aws logs describe-log-groups --region us-west-2 | grep sjc1990app
 ```
 
 ### Essential CDK Commands
@@ -903,19 +903,19 @@ cdk synth --context stage=dev
 cdk diff --context stage=dev
 
 # Deploy all stacks
-cdk deploy --all --context stage=dev --region ap-southeast-1
+cdk deploy --all --context stage=dev --region us-west-2
 
 # Deploy specific stack
 cdk deploy sjc1990app-dev-lambda --context stage=dev
 
 # View deployed stack info
-aws cloudformation describe-stacks --stack-name sjc1990app-dev-api --region ap-southeast-1
+aws cloudformation describe-stacks --stack-name sjc1990app-dev-api --region us-west-2
 
 # View Lambda logs
-aws logs tail /aws/lambda/sjc1990app-dev-authRegister --follow --region ap-southeast-1
+aws logs tail /aws/lambda/sjc1990app-dev-authRegister --follow --region us-west-2
 
 # Destroy all stacks (DELETE ALL RESOURCES!)
-cdk destroy --all --context stage=dev --region ap-southeast-1
+cdk destroy --all --context stage=dev --region us-west-2
 ```
 
 ---

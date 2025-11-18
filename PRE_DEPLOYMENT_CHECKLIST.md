@@ -27,7 +27,7 @@ aws sts get-caller-identity
 
 - [ ] AWS CLI installed (version 2.x)
 - [ ] AWS CLI configured with access keys
-- [ ] Region set to `ap-southeast-1` (or your chosen region)
+- [ ] Region set to `us-west-2` (or your chosen region)
 - [ ] Output format set to `json`
 
 **Test**:
@@ -58,7 +58,7 @@ cd ~/sjc1990app/backend
 npm run build  # Should compile successfully
 
 # Bootstrap CDK (one-time per account/region)
-cdk bootstrap aws://ACCOUNT_ID/ap-southeast-1
+cdk bootstrap aws://ACCOUNT_ID/us-west-2
 ```
 
 ---
@@ -77,13 +77,13 @@ cdk bootstrap aws://ACCOUNT_ID/ap-southeast-1
 aws sns publish \
   --phone-number "+85291234567" \
   --message "AWS SNS test" \
-  --region ap-southeast-1
+  --region us-west-2
 ```
 
 **Test SES**:
 ```bash
 # List verified emails
-aws ses list-verified-email-addresses --region ap-southeast-1
+aws ses list-verified-email-addresses --region us-west-2
 # Should show at least one verified email
 ```
 
@@ -108,7 +108,7 @@ aws ssm put-parameter \
   --name "/sjc1990app/dev/jwt-secret" \
   --value "YOUR_GENERATED_SECRET_HERE" \
   --type "SecureString" \
-  --region ap-southeast-1
+  --region us-west-2
 ```
 
 **Verify**:
@@ -116,7 +116,7 @@ aws ssm put-parameter \
 aws ssm get-parameter \
   --name "/sjc1990app/dev/jwt-secret" \
   --with-decryption \
-  --region ap-southeast-1
+  --region us-west-2
 # Should return your secret (encrypted)
 ```
 
@@ -164,11 +164,11 @@ cdk diff --context stage=dev
 
 - [ ] Region chosen based on your location/requirements
 - [ ] If using `ap-east-1` (Hong Kong), region is enabled in AWS Console
-- [ ] Region matches in all commands (`--region ap-southeast-1`)
+- [ ] Region matches in all commands (`--region us-west-2`)
 - [ ] Region set in CDK deployment matches AWS CLI region
 
 **Recommended Regions**:
-- `ap-southeast-1` - Singapore (most services, no opt-in)
+- `us-west-2` - Singapore (most services, no opt-in)
 - `ap-east-1` - Hong Kong (requires opt-in, slightly more expensive)
 - `us-east-1` - US East Virginia (cheapest, for global testing)
 
@@ -184,7 +184,7 @@ If all checkboxes are ✅, you're ready to deploy!
 cd ~/sjc1990app/infrastructure-cdk
 
 # Deploy all CDK stacks to dev environment
-cdk deploy --all --context stage=dev --region ap-southeast-1
+cdk deploy --all --context stage=dev --region us-west-2
 
 # Deployment takes ~3-5 minutes
 # Watch for any errors during deployment
@@ -199,13 +199,13 @@ cdk deploy --all --context stage=dev --region ap-southeast-1
 ✅ sjc1990app-dev-api (API Gateway created)
 
 Outputs:
-sjc1990app-dev-api.ApiUrl = https://abc123def.execute-api.ap-southeast-1.amazonaws.com/dev/
+sjc1990app-dev-api.ApiUrl = https://abc123def.execute-api.us-west-2.amazonaws.com/dev/
 sjc1990app-dev-database.UsersTableName = sjc1990app-users-dev
 sjc1990app-dev-storage.PhotosBucketName = sjc1990app-dev-photos
 
 Stack ARNs:
-arn:aws:cloudformation:ap-southeast-1:123456789012:stack/sjc1990app-dev-api/...
-arn:aws:cloudformation:ap-southeast-1:123456789012:stack/sjc1990app-dev-database/...
+arn:aws:cloudformation:us-west-2:123456789012:stack/sjc1990app-dev-api/...
+arn:aws:cloudformation:us-west-2:123456789012:stack/sjc1990app-dev-database/...
 ```
 
 **SAVE THIS OUTPUT!** You'll need the API Gateway URL for testing.
@@ -219,7 +219,7 @@ After successful deployment, verify everything works:
 ### 1. Check DynamoDB Tables Created
 
 ```bash
-aws dynamodb list-tables --region ap-southeast-1
+aws dynamodb list-tables --region us-west-2
 
 # Should show 6 tables:
 # - sjc1990app-users-dev
@@ -233,7 +233,7 @@ aws dynamodb list-tables --region ap-southeast-1
 ### 2. Check Lambda Functions Created
 
 ```bash
-aws lambda list-functions --region ap-southeast-1 | grep sjc1990app
+aws lambda list-functions --region us-west-2 | grep sjc1990app
 
 # Should show 14 functions
 ```
@@ -250,7 +250,7 @@ aws s3 ls | grep sjc1990app
 
 ```bash
 # Replace with your actual API Gateway URL from deployment output
-API_URL="https://abc123def.execute-api.ap-southeast-1.amazonaws.com/dev"
+API_URL="https://abc123def.execute-api.us-west-2.amazonaws.com/dev"
 
 # Test user registration
 curl -X POST "$API_URL/auth/register" \
@@ -273,7 +273,7 @@ curl -X POST "$API_URL/auth/register" \
 
 ```bash
 # Tail logs for registration function
-aws logs tail /aws/lambda/sjc1990app-dev-authRegister --follow --region ap-southeast-1
+aws logs tail /aws/lambda/sjc1990app-dev-authRegister --follow --region us-west-2
 ```
 
 ---
@@ -297,7 +297,7 @@ aws ssm put-parameter \
   --name "/sjc1990app/dev/jwt-secret" \
   --value "$(node -e "console.log(require('crypto').randomBytes(32).toString('hex'))")" \
   --type "SecureString" \
-  --region ap-southeast-1
+  --region us-west-2
 
 # Redeploy Lambda stack
 cd ~/sjc1990app/infrastructure-cdk
@@ -319,10 +319,10 @@ npm run build
 **Solution**: Destroy old CDK stacks first
 ```bash
 cd ~/sjc1990app/infrastructure-cdk
-cdk destroy --all --context stage=dev --region ap-southeast-1
+cdk destroy --all --context stage=dev --region us-west-2
 
 # Then redeploy
-cdk deploy --all --context stage=dev --region ap-southeast-1
+cdk deploy --all --context stage=dev --region us-west-2
 ```
 
 ---
@@ -371,5 +371,5 @@ If you encounter issues:
 
 ```bash
 cd ~/sjc1990app/infrastructure-cdk
-cdk deploy --all --context stage=dev --region ap-southeast-1
+cdk deploy --all --context stage=dev --region us-west-2
 ```
