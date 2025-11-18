@@ -42,7 +42,7 @@ export function errorResponse(
   const response: ErrorResponse = {
     error,
     message,
-    ...(details && { details })
+    ...(details ? { details } : {})
   };
 
   return {

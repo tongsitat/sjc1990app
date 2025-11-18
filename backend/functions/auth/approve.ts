@@ -21,13 +21,9 @@ import { successResponse, errors } from '../../shared/utils/response';
 import { logger } from '../../shared/utils/logger';
 import { verifyToken, extractTokenFromHeader } from '../../shared/utils/jwt';
 import { getItem, updateItem, TABLE_NAMES } from '../../shared/utils/dynamodb';
-import { User, UserStatus, PendingApproval, ApprovalStatus } from '../../shared/models/user';
+import { User, UserStatus, ApprovalStatus } from '../../shared/models/user';
 
 const snsClient = new SNSClient({ region: process.env.AWS_REGION || 'us-east-1' });
-
-interface ApproveRequest {
-  adminId: string;
-}
 
 export async function handler(
   event: APIGatewayProxyEvent

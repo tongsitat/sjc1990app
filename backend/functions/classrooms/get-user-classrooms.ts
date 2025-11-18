@@ -82,8 +82,8 @@ export async function handler(
     // Filter out any null classrooms (if classroom was deleted)
     const validClassrooms = classrooms.filter(c => c.classroomId);
 
-    // Sort by year
-    validClassrooms.sort((a, b) => a.year - b.year);
+    // Sort by year (handle undefined years by putting them at the end)
+    validClassrooms.sort((a, b) => (a.year || 9999) - (b.year || 9999));
 
     logger.info('User classrooms retrieved', {
       userId,

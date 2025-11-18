@@ -18,7 +18,6 @@
 
 import { APIGatewayProxyEvent, APIGatewayProxyResult } from 'aws-lambda';
 import { SNSClient, PublishCommand } from '@aws-sdk/client-sns';
-import { v4 as uuidv4 } from 'uuid';
 import { successResponse, errors } from '../../shared/utils/response';
 import { logger } from '../../shared/utils/logger';
 import {
