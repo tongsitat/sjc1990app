@@ -83,6 +83,9 @@ export class LambdaStack extends cdk.Stack {
       },
     };
 
+    // Project root for bundling (parent of infrastructure-cdk)
+    const projectRoot = path.join(__dirname, '../../..');
+
     // Helper function to create Lambda function
     const createFunction = (
       name: string,
@@ -95,6 +98,8 @@ export class LambdaStack extends cdk.Stack {
         entry: path.join(__dirname, '../../../backend/functions', entry),
         handler: 'handler',
         description,
+        projectRoot, // Tell CDK to mount the project root directory
+        depsLockFilePath: path.join(projectRoot, 'backend', 'package-lock.json'),
       });
     };
 
