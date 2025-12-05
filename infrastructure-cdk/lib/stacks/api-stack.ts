@@ -6,20 +6,9 @@ import { Construct } from 'constructs';
 export interface ApiStackProps extends cdk.StackProps {
   stage: string;
   functions: {
-    authRegister: nodejs.NodejsFunction;
-    authVerify: nodejs.NodejsFunction;
-    authPendingApprovals: nodejs.NodejsFunction;
-    authApprove: nodejs.NodejsFunction;
-    authReject: nodejs.NodejsFunction;
-    updateProfile: nodejs.NodejsFunction;
-    uploadPhoto: nodejs.NodejsFunction;
-    completePhotoUpload: nodejs.NodejsFunction;
-    getPreferences: nodejs.NodejsFunction;
-    updatePreferences: nodejs.NodejsFunction;
-    listClassrooms: nodejs.NodejsFunction;
-    assignClassrooms: nodejs.NodejsFunction;
-    getUserClassrooms: nodejs.NodejsFunction;
-    getClassroomMembers: nodejs.NodejsFunction;
+    authService: nodejs.NodejsFunction;
+    usersService: nodejs.NodejsFunction;
+    classroomsService: nodejs.NodejsFunction;
   };
 }
 
@@ -36,7 +25,7 @@ export class ApiStack extends cdk.Stack {
     // Create REST API
     this.api = new apigateway.RestApi(this, 'Api', {
       restApiName: `${serviceName}-${stage}-api`,
-      description: 'API Gateway for sjc1990app backend',
+      description: 'API Gateway for sjc1990app backend (consolidated 3-service architecture)',
       deployOptions: {
         stageName: stage,
         throttlingRateLimit: 1000,
@@ -44,6 +33,11 @@ export class ApiStack extends cdk.Stack {
         metricsEnabled: true,
         loggingLevel: apigateway.MethodLoggingLevel.INFO,
         dataTraceEnabled: stage === 'dev', // Detailed logs in dev only
+        // API Gateway caching (per ADR-012 optimization)
+        cachingEnabled: true,
+        cacheClusterEnabled: true,
+        cacheClusterSize: '0.5', // 0.5GB cache
+        cacheTtl: cdk.Duration.minutes(5), // 5-minute TTL for GET requests
       },
       defaultCorsPreflightOptions: {
         allowOrigins: apigateway.Cors.ALL_ORIGINS, // TODO: Restrict in production
@@ -71,78 +65,109 @@ export class ApiStack extends cdk.Stack {
       return new apigateway.LambdaIntegration(fn, lambdaIntegrationOptions);
     };
 
-    // /auth resource
+    // ===== /auth resource (Auth Service) =====
     const authResource = this.api.root.addResource('auth');
+    const authIntegration = createIntegration(functions.authService);
 
     // POST /auth/register
     authResource
       .addResource('register')
-      .addMethod('POST', createIntegration(functions.authRegister));
+      .addMethod('POST', authIntegration);
 
     // POST /auth/verify
     authResource
       .addResource('verify')
-      .addMethod('POST', createIntegration(functions.authVerify));
+      .addMethod('POST', authIntegration);
 
-    // GET /auth/pending-approvals
+    // GET /auth/pending-approvals (with caching)
     authResource
       .addResource('pending-approvals')
-      .addMethod('GET', createIntegration(functions.authPendingApprovals));
+      .addMethod('GET', authIntegration, {
+        requestParameters: {
+          'method.request.header.Authorization': true,
+        },
+      });
 
     // POST /auth/approve/{userId}
     const approveResource = authResource.addResource('approve');
     approveResource
       .addResource('{userId}')
-      .addMethod('POST', createIntegration(functions.authApprove));
+      .addMethod('POST', authIntegration);
 
     // POST /auth/reject/{userId}
     const rejectResource = authResource.addResource('reject');
     rejectResource
       .addResource('{userId}')
-      .addMethod('POST', createIntegration(functions.authReject));
+      .addMethod('POST', authIntegration);
 
-    // /users resource
+    // ===== /users resource (Users Service) =====
     const usersResource = this.api.root.addResource('users');
     const userResource = usersResource.addResource('{userId}');
+    const usersIntegration = createIntegration(functions.usersService);
 
     // PUT /users/{userId}/profile
     userResource
       .addResource('profile')
-      .addMethod('PUT', createIntegration(functions.updateProfile));
+      .addMethod('PUT', usersIntegration);
 
     // POST /users/{userId}/profile-photo
     userResource
       .addResource('profile-photo')
-      .addMethod('POST', createIntegration(functions.uploadPhoto));
+      .addMethod('POST', usersIntegration);
 
     // PUT /users/{userId}/profile-photo-complete
     userResource
       .addResource('profile-photo-complete')
-      .addMethod('PUT', createIntegration(functions.completePhotoUpload));
+      .addMethod('PUT', usersIntegration);
 
-    // GET /users/{userId}/preferences
+    // GET /users/{userId}/preferences (with caching)
     // PUT /users/{userId}/preferences
     const preferencesResource = userResource.addResource('preferences');
-    preferencesResource.addMethod('GET', createIntegration(functions.getPreferences));
-    preferencesResource.addMethod('PUT', createIntegration(functions.updatePreferences));
 
-    // GET /users/{userId}/classrooms
+    preferencesResource.addMethod('GET', usersIntegration, {
+      requestParameters: {
+        'method.request.path.userId': true,
+        'method.request.header.Authorization': true,
+      },
+    });
+
+    preferencesResource.addMethod('PUT', usersIntegration);
+
+    // GET /users/{userId}/classrooms (with caching)
     // POST /users/{userId}/classrooms
     const userClassroomsResource = userResource.addResource('classrooms');
-    userClassroomsResource.addMethod('GET', createIntegration(functions.getUserClassrooms));
-    userClassroomsResource.addMethod('POST', createIntegration(functions.assignClassrooms));
+    const classroomsIntegration = createIntegration(functions.classroomsService);
 
-    // /classrooms resource
+    userClassroomsResource.addMethod('GET', classroomsIntegration, {
+      requestParameters: {
+        'method.request.path.userId': true,
+        'method.request.header.Authorization': true,
+      },
+    });
+
+    userClassroomsResource.addMethod('POST', classroomsIntegration);
+
+    // ===== /classrooms resource (Classrooms Service) =====
     const classroomsResource = this.api.root.addResource('classrooms');
 
-    // GET /classrooms
-    classroomsResource.addMethod('GET', createIntegration(functions.listClassrooms));
+    // GET /classrooms (with caching)
+    classroomsResource.addMethod('GET', classroomsIntegration, {
+      requestParameters: {
+        'method.request.header.Authorization': true,
+        'method.request.querystring.year': false, // Optional query param
+      },
+    });
 
-    // GET /classrooms/{classroomId}/members
+    // GET /classrooms/{classroomId}/members (with caching)
     const classroomResource = classroomsResource.addResource('{classroomId}');
     classroomResource
       .addResource('members')
-      .addMethod('GET', createIntegration(functions.getClassroomMembers));
+      .addMethod('GET', classroomsIntegration, {
+        requestParameters: {
+          'method.request.path.classroomId': true,
+          'method.request.header.Authorization': true,
+        },
+      });
 
     // API URL
     this.apiUrl = this.api.url;
@@ -158,6 +183,11 @@ export class ApiStack extends cdk.Stack {
       value: this.api.restApiId,
       description: 'API Gateway REST API ID',
       exportName: `${serviceName}-${stage}-api-id`,
+    });
+
+    new cdk.CfnOutput(this, 'ApiCacheEnabled', {
+      value: 'true',
+      description: 'API Gateway caching enabled (5-minute TTL for GET requests)',
     });
   }
 }

@@ -1,0 +1,13 @@
+{
+  "name": "sjc1990app-node-modules-layer",
+  "version": "1.0.0",
+  "description": "Third-party dependencies Lambda Layer for sjc1990app",
+  "dependencies": {
+    "@middy/core": "^4.6.0",
+    "@middy/http-cors": "^4.6.0",
+    "@middy/http-error-handler": "^4.6.0",
+    "@middy/http-json-body-parser": "^4.6.0",
+    "jsonwebtoken": "^9.0.2",
+    "uuid": "^9.0.1"
+  }
+}

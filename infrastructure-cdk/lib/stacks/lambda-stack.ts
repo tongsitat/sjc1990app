@@ -22,21 +22,16 @@ export interface LambdaStackProps extends cdk.StackProps {
 }
 
 export class LambdaStack extends cdk.Stack {
+  // Updated to 3 consolidated services (down from 14 individual functions)
   public readonly functions: {
-    authRegister: nodejs.NodejsFunction;
-    authVerify: nodejs.NodejsFunction;
-    authPendingApprovals: nodejs.NodejsFunction;
-    authApprove: nodejs.NodejsFunction;
-    authReject: nodejs.NodejsFunction;
-    updateProfile: nodejs.NodejsFunction;
-    uploadPhoto: nodejs.NodejsFunction;
-    completePhotoUpload: nodejs.NodejsFunction;
-    getPreferences: nodejs.NodejsFunction;
-    updatePreferences: nodejs.NodejsFunction;
-    listClassrooms: nodejs.NodejsFunction;
-    assignClassrooms: nodejs.NodejsFunction;
-    getUserClassrooms: nodejs.NodejsFunction;
-    getClassroomMembers: nodejs.NodejsFunction;
+    authService: nodejs.NodejsFunction;
+    usersService: nodejs.NodejsFunction;
+    classroomsService: nodejs.NodejsFunction;
+  };
+
+  public readonly layers: {
+    awsSdkLayer: lambda.LayerVersion;
+    nodeModulesLayer: lambda.LayerVersion;
   };
 
   constructor(scope: Construct, id: string, props: LambdaStackProps) {
@@ -54,8 +49,6 @@ export class LambdaStack extends cdk.Stack {
     );
 
     // Common environment variables for all Lambda functions
-    // Note: AWS_REGION is automatically provided by Lambda runtime
-    // Note: JWT_SECRET_NAME stores the secret name, not the value (fetched at runtime)
     const commonEnvironment = {
       STAGE: stage,
       TABLE_USERS: tables.users.tableName,
@@ -66,8 +59,51 @@ export class LambdaStack extends cdk.Stack {
       TABLE_USER_CLASSROOMS: tables.userClassrooms.tableName,
       S3_PHOTOS_BUCKET: photosBucket.bucketName,
       CDN_BASE_URL: `https://${photosBucket.bucketName}.s3.${cdk.Stack.of(this).region}.amazonaws.com`,
-      JWT_SECRET_NAME: jwtSecret.secretName, // Lambda will fetch the actual value at runtime
+      JWT_SECRET_NAME: jwtSecret.secretName,
     };
+
+    // Project root for bundling
+    const projectRoot = path.join(__dirname, '../../..');
+
+    // ===== Lambda Layers =====
+    // Layer 1: AWS SDK v3 clients (~200KB)
+    this.layers = {} as any;
+
+    this.layers.awsSdkLayer = new lambda.LayerVersion(this, 'AwsSdkLayer', {
+      layerVersionName: `${serviceName}-${stage}-aws-sdk`,
+      description: 'AWS SDK v3 clients (DynamoDB, S3, SNS, Secrets Manager)',
+      code: lambda.Code.fromAsset(path.join(projectRoot, 'backend/layers/aws-sdk-layer'), {
+        bundling: {
+          image: lambda.Runtime.NODEJS_20_X.bundlingImage,
+          command: [
+            'bash',
+            '-c',
+            'cd /asset-input/nodejs && npm install --production && cp -r /asset-input/. /asset-output/',
+          ],
+        },
+      }),
+      compatibleRuntimes: [lambda.Runtime.NODEJS_20_X],
+    });
+
+    // Layer 2: Third-party node modules (jsonwebtoken, uuid, middy) (~150KB)
+    this.layers.nodeModulesLayer = new lambda.LayerVersion(this, 'NodeModulesLayer', {
+      layerVersionName: `${serviceName}-${stage}-node-modules`,
+      description: 'Third-party dependencies (jsonwebtoken, uuid, middy)',
+      code: lambda.Code.fromAsset(path.join(projectRoot, 'backend/layers/node-modules-layer'), {
+        bundling: {
+          image: lambda.Runtime.NODEJS_20_X.bundlingImage,
+          command: [
+            'bash',
+            '-c',
+            'cd /asset-input/nodejs && npm install --production && cp -r /asset-input/. /asset-output/',
+          ],
+        },
+      }),
+      compatibleRuntimes: [lambda.Runtime.NODEJS_20_X],
+    });
+
+    // Note: shared utilities are bundled with each function to maintain relative imports
+    // Alternative: Create shared-utils-layer and update all imports to use layer path
 
     // Common Lambda configuration
     const commonLambdaProps = {
@@ -75,19 +111,32 @@ export class LambdaStack extends cdk.Stack {
       memorySize: 256,
       timeout: cdk.Duration.seconds(30),
       environment: commonEnvironment,
+      layers: [this.layers.awsSdkLayer, this.layers.nodeModulesLayer],
       bundling: {
         minify: true,
         sourceMap: true,
-        externalModules: ['aws-sdk'], // Use Lambda runtime SDK
+        // External modules provided by layers
+        externalModules: [
+          'aws-sdk',
+          '@aws-sdk/client-dynamodb',
+          '@aws-sdk/client-s3',
+          '@aws-sdk/client-secrets-manager',
+          '@aws-sdk/client-sns',
+          '@aws-sdk/lib-dynamodb',
+          '@aws-sdk/s3-request-presigner',
+          'jsonwebtoken',
+          'uuid',
+          '@middy/core',
+          '@middy/http-cors',
+          '@middy/http-error-handler',
+          '@middy/http-json-body-parser',
+        ],
         target: 'es2020',
       },
     };
 
-    // Project root for bundling (parent of infrastructure-cdk)
-    const projectRoot = path.join(__dirname, '../../..');
-
-    // Helper function to create Lambda function
-    const createFunction = (
+    // Helper function to create consolidated service Lambda
+    const createServiceFunction = (
       name: string,
       entry: string,
       description: string
@@ -95,10 +144,10 @@ export class LambdaStack extends cdk.Stack {
       const fn = new nodejs.NodejsFunction(this, name, {
         ...commonLambdaProps,
         functionName: `${serviceName}-${stage}-${name}`,
-        entry: path.join(__dirname, '../../../backend/functions', entry),
+        entry: path.join(__dirname, '../../../backend/services', entry),
         handler: 'handler',
         description,
-        projectRoot, // Tell CDK to mount the project root directory
+        projectRoot,
         depsLockFilePath: path.join(projectRoot, 'backend', 'package-lock.json'),
       });
 
@@ -108,101 +157,36 @@ export class LambdaStack extends cdk.Stack {
       return fn;
     };
 
-    // 1. Authentication Functions
+    // ===== 3 Consolidated Lambda Functions =====
+
+    // 1. Auth Service (5 endpoints: register, verify, pending-approvals, approve, reject)
     this.functions = {} as any;
 
-    this.functions.authRegister = createFunction(
-      'authRegister',
-      'auth/register.ts',
-      'User registration with phone number'
+    this.functions.authService = createServiceFunction(
+      'auth-service',
+      'auth-service/index.ts',
+      'Authentication service: registration, verification, approval'
     );
 
-    this.functions.authVerify = createFunction(
-      'authVerify',
-      'auth/verify.ts',
-      'Verify SMS code and create user'
+    // 2. Users Service (5 endpoints: profile, photo upload, photo complete, preferences get/update)
+    this.functions.usersService = createServiceFunction(
+      'users-service',
+      'users-service/index.ts',
+      'Users service: profile management, photos, preferences'
     );
 
-    this.functions.authPendingApprovals = createFunction(
-      'authPendingApprovals',
-      'auth/pending-approvals.ts',
-      'List users pending approval (admin)'
+    // 3. Classrooms Service (4 endpoints: list, assign, get user classrooms, get members)
+    this.functions.classroomsService = createServiceFunction(
+      'classrooms-service',
+      'classrooms-service/index.ts',
+      'Classrooms service: classroom and membership management'
     );
 
-    this.functions.authApprove = createFunction(
-      'authApprove',
-      'auth/approve.ts',
-      'Approve user registration (admin)'
-    );
-
-    this.functions.authReject = createFunction(
-      'authReject',
-      'auth/reject.ts',
-      'Reject user registration (admin)'
-    );
-
-    // 2. User Profile Functions
-    this.functions.updateProfile = createFunction(
-      'updateProfile',
-      'users/update-profile.ts',
-      'Update user profile (name, bio)'
-    );
-
-    this.functions.uploadPhoto = createFunction(
-      'uploadPhoto',
-      'users/upload-photo.ts',
-      'Generate S3 pre-signed URL for photo upload'
-    );
-
-    this.functions.completePhotoUpload = createFunction(
-      'completePhotoUpload',
-      'users/complete-photo-upload.ts',
-      'Complete photo upload and update user record'
-    );
-
-    // 3. User Preferences Functions
-    this.functions.getPreferences = createFunction(
-      'getPreferences',
-      'users/get-preferences.ts',
-      'Get user communication preferences'
-    );
-
-    this.functions.updatePreferences = createFunction(
-      'updatePreferences',
-      'users/update-preferences.ts',
-      'Update user communication preferences'
-    );
-
-    // 4. Classroom Functions
-    this.functions.listClassrooms = createFunction(
-      'listClassrooms',
-      'classrooms/list-classrooms.ts',
-      'List all classrooms (filter by year)'
-    );
-
-    this.functions.assignClassrooms = createFunction(
-      'assignClassrooms',
-      'classrooms/assign-classrooms.ts',
-      'Assign multiple classrooms to user'
-    );
-
-    this.functions.getUserClassrooms = createFunction(
-      'getUserClassrooms',
-      'classrooms/get-user-classrooms.ts',
-      "Get user's classroom history"
-    );
-
-    this.functions.getClassroomMembers = createFunction(
-      'getClassroomMembers',
-      'classrooms/get-classroom-members.ts',
-      'Get all members of a classroom'
-    );
-
-    // Grant DynamoDB permissions
+    // ===== Grant Permissions =====
     const allFunctions = Object.values(this.functions);
 
+    // DynamoDB permissions for all services
     allFunctions.forEach((fn) => {
-      // Read/write permissions for all tables
       tables.users.grantReadWriteData(fn);
       tables.verificationCodes.grantReadWriteData(fn);
       tables.pendingApprovals.grantReadWriteData(fn);
@@ -220,51 +204,53 @@ export class LambdaStack extends cdk.Stack {
       );
     });
 
-    // Grant S3 permissions to photo-related functions
-    const photoFunctions = [
-      this.functions.uploadPhoto,
-      this.functions.completePhotoUpload,
-    ];
+    // S3 permissions for users-service (photo upload/complete)
+    photosBucket.grantPut(this.functions.usersService);
+    photosBucket.grantRead(this.functions.usersService);
+    this.functions.usersService.addToRolePolicy(
+      new iam.PolicyStatement({
+        effect: iam.Effect.ALLOW,
+        actions: ['s3:HeadObject'],
+        resources: [`${photosBucket.bucketArn}/*`],
+      })
+    );
 
-    photoFunctions.forEach((fn) => {
-      photosBucket.grantPut(fn);
-      photosBucket.grantRead(fn);
-      // HeadObject permission for checking upload completion
-      fn.addToRolePolicy(
-        new iam.PolicyStatement({
-          effect: iam.Effect.ALLOW,
-          actions: ['s3:HeadObject'],
-          resources: [`${photosBucket.bucketArn}/*`],
-        })
-      );
+    // SNS publish permission for auth-service (SMS sending)
+    this.functions.authService.addToRolePolicy(
+      new iam.PolicyStatement({
+        effect: iam.Effect.ALLOW,
+        actions: ['sns:Publish'],
+        resources: ['*'], // SNS SMS doesn't support resource-level permissions
+      })
+    );
+
+    // ===== CloudFormation Outputs =====
+    new cdk.CfnOutput(this, 'AuthServiceFunctionName', {
+      value: this.functions.authService.functionName,
+      description: 'Auth Service Lambda function name',
+      exportName: `${serviceName}-${stage}-auth-service-name`,
     });
 
-    // Grant SNS publish permission for SMS
-    const smsFunctions = [
-      this.functions.authRegister,
-      this.functions.authApprove,
-      this.functions.authReject,
-    ];
-
-    smsFunctions.forEach((fn) => {
-      fn.addToRolePolicy(
-        new iam.PolicyStatement({
-          effect: iam.Effect.ALLOW,
-          actions: ['sns:Publish'],
-          resources: ['*'], // SNS SMS doesn't support resource-level permissions
-        })
-      );
+    new cdk.CfnOutput(this, 'UsersServiceFunctionName', {
+      value: this.functions.usersService.functionName,
+      description: 'Users Service Lambda function name',
+      exportName: `${serviceName}-${stage}-users-service-name`,
     });
 
-    // CloudFormation Outputs
-    new cdk.CfnOutput(this, 'AuthRegisterFunctionName', {
-      value: this.functions.authRegister.functionName,
-      description: 'Auth Register Lambda function name',
+    new cdk.CfnOutput(this, 'ClassroomsServiceFunctionName', {
+      value: this.functions.classroomsService.functionName,
+      description: 'Classrooms Service Lambda function name',
+      exportName: `${serviceName}-${stage}-classrooms-service-name`,
     });
 
-    new cdk.CfnOutput(this, 'AuthVerifyFunctionName', {
-      value: this.functions.authVerify.functionName,
-      description: 'Auth Verify Lambda function name',
+    new cdk.CfnOutput(this, 'AwsSdkLayerArn', {
+      value: this.layers.awsSdkLayer.layerVersionArn,
+      description: 'AWS SDK Lambda Layer ARN',
+    });
+
+    new cdk.CfnOutput(this, 'NodeModulesLayerArn', {
+      value: this.layers.nodeModulesLayer.layerVersionArn,
+      description: 'Node Modules Lambda Layer ARN',
     });
   }
 }

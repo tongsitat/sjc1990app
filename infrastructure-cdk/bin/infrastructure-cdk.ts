@@ -5,6 +5,7 @@ import { DatabaseStack } from '../lib/stacks/database-stack';
 import { LambdaStack } from '../lib/stacks/lambda-stack';
 import { ApiStack } from '../lib/stacks/api-stack';
 import { StorageStack } from '../lib/stacks/storage-stack';
+import { MonitoringStack } from '../lib/stacks/monitoring-stack';
 
 const app = new cdk.App();
 
@@ -28,11 +29,11 @@ const tags = {
   ManagedBy: 'CDK',
 };
 
-// 1. Storage Stack (S3 bucket for photos)
+// 1. Storage Stack (S3 bucket + CloudFront CDN for photos)
 const storageStack = new StorageStack(app, `${stackPrefix}-storage`, {
   env,
   stackName: `${stackPrefix}-storage`,
-  description: 'S3 bucket for profile photos and class photos',
+  description: 'S3 bucket and CloudFront CDN for profile photos and class photos',
   tags,
   stage,
 });
@@ -67,9 +68,24 @@ const apiStack = new ApiStack(app, `${stackPrefix}-api`, {
   functions: lambdaStack.functions,
 });
 
+// 5. Monitoring Stack (CloudWatch alarms)
+const monitoringStack = new MonitoringStack(app, `${stackPrefix}-monitoring`, {
+  env,
+  stackName: `${stackPrefix}-monitoring`,
+  description: 'CloudWatch alarms for Lambda, API Gateway, and cost monitoring',
+  tags,
+  stage,
+  functions: lambdaStack.functions,
+  api: apiStack.api,
+  // Optional: Add alarm email
+  // alarmEmail: 'your-email@example.com',
+});
+
 // Stack dependencies
 lambdaStack.addDependency(databaseStack);
 lambdaStack.addDependency(storageStack);
 apiStack.addDependency(lambdaStack);
+monitoringStack.addDependency(lambdaStack);
+monitoringStack.addDependency(apiStack);
 
 app.synth();
