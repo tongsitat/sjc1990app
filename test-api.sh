@@ -148,7 +148,7 @@ fi
 # Test 7: Lambda Logs Check
 print_test "7. Lambda Logs Check (Last 10 minutes)"
 echo "Checking auth-service logs for errors..."
-LOG_GROUP="/aws/lambda/sjc1990app-dev-authService"
+LOG_GROUP="/aws/lambda/sjc1990app-dev-auth-service"
 
 # Check if log group exists
 if aws logs describe-log-groups --log-group-name-prefix "$LOG_GROUP" --region $REGION | jq -e '.logGroups | length > 0' > /dev/null 2>&1; then
