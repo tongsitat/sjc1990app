@@ -45,11 +45,12 @@ export class MonitoringStack extends cdk.Stack {
     // ===== Lambda Function Alarms =====
     const allFunctions = Object.values(functions);
 
-    allFunctions.forEach((fn) => {
+    allFunctions.forEach((fn, index) => {
       const functionName = fn.functionName;
+      const alarmIdPrefix = `Function${index}`;
 
       // 1. Lambda Errors Alarm (> 1% error rate)
-      new cloudwatch.Alarm(this, `${functionName}-Errors`, {
+      new cloudwatch.Alarm(this, `${alarmIdPrefix}-Errors`, {
         alarmName: `${functionName}-errors`,
         alarmDescription: `Errors for ${functionName} exceed 1%`,
         metric: fn.metricErrors({
@@ -64,7 +65,7 @@ export class MonitoringStack extends cdk.Stack {
       }).addAlarmAction(alarmAction);
 
       // 2. Lambda Throttles Alarm
-      new cloudwatch.Alarm(this, `${functionName}-Throttles`, {
+      new cloudwatch.Alarm(this, `${alarmIdPrefix}-Throttles`, {
         alarmName: `${functionName}-throttles`,
         alarmDescription: `Throttles detected for ${functionName}`,
         metric: fn.metricThrottles({
@@ -78,7 +79,7 @@ export class MonitoringStack extends cdk.Stack {
       }).addAlarmAction(alarmAction);
 
       // 3. Lambda Duration Alarm (> 10 seconds for 80% of invocations)
-      new cloudwatch.Alarm(this, `${functionName}-Duration`, {
+      new cloudwatch.Alarm(this, `${alarmIdPrefix}-Duration`, {
         alarmName: `${functionName}-duration`,
         alarmDescription: `Duration for ${functionName} exceeds 10 seconds (p80)`,
         metric: fn.metricDuration({
@@ -93,7 +94,7 @@ export class MonitoringStack extends cdk.Stack {
       }).addAlarmAction(alarmAction);
 
       // 4. Lambda Concurrent Executions Alarm (approaching limit)
-      new cloudwatch.Alarm(this, `${functionName}-ConcurrentExecutions`, {
+      new cloudwatch.Alarm(this, `${alarmIdPrefix}-ConcurrentExecutions`, {
         alarmName: `${functionName}-concurrent-executions`,
         alarmDescription: `Concurrent executions for ${functionName} approaching limit`,
         metric: new cloudwatch.Metric({
