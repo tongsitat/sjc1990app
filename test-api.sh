@@ -131,18 +131,27 @@ fi
 
 # Test 6: Pending Approvals
 print_test "6. Pending Approvals (GET /auth/pending-approvals)"
-echo "Fetching pending approvals..."
+echo "Testing pending approvals endpoint (requires admin JWT)..."
 APPROVALS_RESPONSE=$(curl -s -X GET "$API_URL/auth/pending-approvals" \
   -H "Content-Type: application/json")
 
 echo "$APPROVALS_RESPONSE" | jq '.'
 
-if echo "$APPROVALS_RESPONSE" | jq -e '.users' > /dev/null 2>&1; then
-    print_success "Pending approvals endpoint responded"
-    USER_COUNT=$(echo "$APPROVALS_RESPONSE" | jq -r '.users | length')
+# This endpoint requires JWT authentication (admin only)
+if echo "$APPROVALS_RESPONSE" | jq -e '.error' > /dev/null 2>&1; then
+    ERROR_TYPE=$(echo "$APPROVALS_RESPONSE" | jq -r '.error')
+    if [ "$ERROR_TYPE" = "UNAUTHORIZED" ]; then
+        print_success "Endpoint properly requires authentication"
+        print_info "Note: This endpoint requires admin JWT token"
+    else
+        print_error "Unexpected error: $ERROR_TYPE"
+    fi
+elif echo "$APPROVALS_RESPONSE" | jq -e '.approvals' > /dev/null 2>&1; then
+    print_success "Pending approvals endpoint responded (authenticated)"
+    USER_COUNT=$(echo "$APPROVALS_RESPONSE" | jq -r '.approvals | length')
     print_info "Pending users: $USER_COUNT"
 else
-    print_error "Pending approvals endpoint error"
+    print_error "Unexpected response format"
 fi
 
 # Test 7: Lambda Logs Check
