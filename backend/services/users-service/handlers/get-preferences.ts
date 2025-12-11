@@ -85,7 +85,7 @@ export async function handler(
     return successResponse(preferences);
 
   } catch (error) {
-    if (error instanceof Error && error.message.includes('token')) {
+    if (error instanceof Error && (error.message.includes('token') || error.message.includes('Authorization'))) {
       return errors.unauthorized(error.message);
     }
     logger.error('Get preferences failed', error as Error);

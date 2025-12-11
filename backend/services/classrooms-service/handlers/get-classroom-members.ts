@@ -111,7 +111,7 @@ export async function handler(
     });
 
   } catch (error) {
-    if (error instanceof Error && error.message.includes('token')) {
+    if (error instanceof Error && (error.message.includes('token') || error.message.includes('Authorization'))) {
       return errors.unauthorized(error.message);
     }
     logger.error('Get classroom members failed', error as Error);
