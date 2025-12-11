@@ -152,12 +152,13 @@ fi
 
 # SES Email
 echo "Checking SES verified emails..."
-SES_EMAILS=$(aws ses list-verified-email-addresses --region $REGION --output json 2>/dev/null || echo '{"VerifiedEmailAddresses":[]}')
-EMAIL_COUNT=$(echo "$SES_EMAILS" | jq '.VerifiedEmailAddresses | length')
+# Use SES v2 API (new console uses this)
+SES_EMAILS=$(aws sesv2 list-email-identities --region $REGION --output json 2>/dev/null || echo '{"EmailIdentities":[]}')
+EMAIL_COUNT=$(echo "$SES_EMAILS" | jq '.EmailIdentities | length')
 
 if [ "$EMAIL_COUNT" -gt 0 ]; then
     check_pass "SES has $EMAIL_COUNT verified email(s)"
-    echo "$SES_EMAILS" | jq -r '.VerifiedEmailAddresses[]' | while read email; do
+    echo "$SES_EMAILS" | jq -r '.EmailIdentities[].IdentityName' | while read email; do
         check_info "  - $email"
     done
 else
