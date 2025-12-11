@@ -1,6 +1,8 @@
 import * as cdk from 'aws-cdk-lib';
 import * as apigateway from 'aws-cdk-lib/aws-apigateway';
 import * as nodejs from 'aws-cdk-lib/aws-lambda-nodejs';
+import * as logs from 'aws-cdk-lib/aws-logs';
+import * as wafv2 from 'aws-cdk-lib/aws-wafv2';
 import { Construct } from 'constructs';
 
 export interface ApiStackProps extends cdk.StackProps {
@@ -22,17 +24,42 @@ export class ApiStack extends cdk.Stack {
     const { stage, functions } = props;
     const serviceName = 'sjc1990app';
 
+    // Create CloudWatch Log Group for API Gateway access logs
+    const accessLogGroup = new logs.LogGroup(this, 'ApiAccessLogs', {
+      logGroupName: `/aws/apigateway/${serviceName}-${stage}-access-logs`,
+      retention: logs.RetentionDays.ONE_MONTH, // 30 days retention
+      removalPolicy: cdk.RemovalPolicy.DESTROY, // Delete logs when stack is destroyed (dev only)
+    });
+
     // Create REST API
     this.api = new apigateway.RestApi(this, 'Api', {
       restApiName: `${serviceName}-${stage}-api`,
       description: 'API Gateway for sjc1990app backend (consolidated 3-service architecture)',
       deployOptions: {
         stageName: stage,
-        throttlingRateLimit: 1000,
-        throttlingBurstLimit: 2000,
+        // Security hardening: Reduced rate limits (per SECURITY_INCIDENT_2025-12-11.md)
+        throttlingRateLimit: 10, // 10 requests/second (reduced from 1000)
+        throttlingBurstLimit: 20, // 20 burst (reduced from 2000)
         metricsEnabled: true,
         loggingLevel: apigateway.MethodLoggingLevel.INFO,
         dataTraceEnabled: stage === 'dev', // Detailed logs in dev only
+        // Security: API Gateway access logging (tracks source IP, user agent, endpoint)
+        accessLogDestination: new apigateway.LogGroupLogDestination(accessLogGroup),
+        accessLogFormat: apigateway.AccessLogFormat.custom(
+          JSON.stringify({
+            requestId: '$context.requestId',
+            sourceIp: '$context.identity.sourceIp',
+            requestTime: '$context.requestTime',
+            httpMethod: '$context.httpMethod',
+            resourcePath: '$context.resourcePath',
+            status: '$context.status',
+            protocol: '$context.protocol',
+            responseLength: '$context.responseLength',
+            userAgent: '$context.identity.userAgent',
+            errorMessage: '$context.error.message',
+            errorType: '$context.error.messageString',
+          })
+        ),
         // API Gateway caching (per ADR-012 optimization)
         cachingEnabled: true,
         cacheClusterEnabled: true,
@@ -172,6 +199,82 @@ export class ApiStack extends cdk.Stack {
     // API URL
     this.apiUrl = this.api.url;
 
+    // ===== WAF (Web Application Firewall) =====
+    // Protect API against common web attacks
+    const webAcl = new wafv2.CfnWebACL(this, 'ApiWebACL', {
+      name: `${serviceName}-${stage}-api-waf`,
+      description: 'WAF rules to protect API Gateway from common attacks',
+      scope: 'REGIONAL', // For API Gateway (not CloudFront)
+      defaultAction: { allow: {} },
+      visibilityConfig: {
+        sampledRequestsEnabled: true,
+        cloudWatchMetricsEnabled: true,
+        metricName: `${serviceName}-${stage}-api-waf-metrics`,
+      },
+      rules: [
+        // Rule 1: AWS Managed Core Rule Set (SQL injection, XSS, etc.)
+        {
+          name: 'AWSManagedRulesCommonRuleSet',
+          priority: 10,
+          statement: {
+            managedRuleGroupStatement: {
+              vendorName: 'AWS',
+              name: 'AWSManagedRulesCommonRuleSet',
+            },
+          },
+          overrideAction: { none: {} },
+          visibilityConfig: {
+            sampledRequestsEnabled: true,
+            cloudWatchMetricsEnabled: true,
+            metricName: 'AWSManagedRulesCommonRuleSetMetric',
+          },
+        },
+        // Rule 2: AWS Managed Known Bad Inputs (malformed requests)
+        {
+          name: 'AWSManagedRulesKnownBadInputsRuleSet',
+          priority: 20,
+          statement: {
+            managedRuleGroupStatement: {
+              vendorName: 'AWS',
+              name: 'AWSManagedRulesKnownBadInputsRuleSet',
+            },
+          },
+          overrideAction: { none: {} },
+          visibilityConfig: {
+            sampledRequestsEnabled: true,
+            cloudWatchMetricsEnabled: true,
+            metricName: 'AWSManagedRulesKnownBadInputsRuleSetMetric',
+          },
+        },
+        // Rule 3: Rate-based rule (block IPs with >100 requests in 5 minutes)
+        {
+          name: 'RateLimitRule',
+          priority: 30,
+          statement: {
+            rateBasedStatement: {
+              limit: 100, // 100 requests per 5 minutes per IP
+              aggregateKeyType: 'IP',
+            },
+          },
+          action: { block: {} },
+          visibilityConfig: {
+            sampledRequestsEnabled: true,
+            cloudWatchMetricsEnabled: true,
+            metricName: 'RateLimitRuleMetric',
+          },
+        },
+      ],
+    });
+
+    // Associate WAF with API Gateway
+    const webAclAssociation = new wafv2.CfnWebACLAssociation(this, 'ApiWebACLAssociation', {
+      resourceArn: `arn:aws:apigateway:${this.region}::/restapis/${this.api.restApiId}/stages/${stage}`,
+      webAclArn: webAcl.attrArn,
+    });
+
+    // Ensure WAF is created before association
+    webAclAssociation.addDependency(webAcl);
+
     // CloudFormation Outputs
     new cdk.CfnOutput(this, 'ApiUrl', {
       value: this.apiUrl,
@@ -188,6 +291,23 @@ export class ApiStack extends cdk.Stack {
     new cdk.CfnOutput(this, 'ApiCacheEnabled', {
       value: 'true',
       description: 'API Gateway caching enabled (5-minute TTL for GET requests)',
+    });
+
+    new cdk.CfnOutput(this, 'AccessLogGroup', {
+      value: accessLogGroup.logGroupName,
+      description: 'CloudWatch Log Group for API Gateway access logs (includes source IPs)',
+      exportName: `${serviceName}-${stage}-access-log-group`,
+    });
+
+    new cdk.CfnOutput(this, 'RateLimits', {
+      value: '10 req/sec, 20 burst',
+      description: 'API Gateway rate limiting (security hardening)',
+    });
+
+    new cdk.CfnOutput(this, 'WafWebAclArn', {
+      value: webAcl.attrArn,
+      description: 'WAF WebACL ARN protecting API Gateway (SQL injection, XSS, rate limiting)',
+      exportName: `${serviceName}-${stage}-waf-arn`,
     });
   }
 }
