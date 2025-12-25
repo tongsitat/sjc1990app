@@ -3,6 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_dotenv/flutter_dotenv.dart';
 import 'providers/auth_provider.dart';
 import 'screens/auth/login_screen.dart';
+import 'screens/auth/pending_approval_screen.dart';
 
 void main() async {
   // Ensure Flutter bindings are initialized
@@ -57,7 +58,12 @@ class AuthGate extends ConsumerWidget {
       return const LoginScreen();
     }
 
-    // Show home page if authenticated
+    // Show pending approval screen if user is pending
+    if (authState.user?.isPending == true) {
+      return const PendingApprovalScreen();
+    }
+
+    // Show home page if authenticated and approved
     return const HomePage();
   }
 }
