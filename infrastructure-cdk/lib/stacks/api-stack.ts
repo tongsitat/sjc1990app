@@ -60,11 +60,12 @@ export class ApiStack extends cdk.Stack {
             errorType: '$context.error.messageString',
           })
         ),
-        // API Gateway caching (per ADR-012 optimization)
-        cachingEnabled: true,
-        cacheClusterEnabled: true,
-        cacheClusterSize: '0.5', // 0.5GB cache
-        cacheTtl: cdk.Duration.minutes(5), // 5-minute TTL for GET requests
+        // API Gateway caching DISABLED for dev (costs $0.48/day with zero traffic)
+        // Re-enable for production when needed (per ADR-012 optimization)
+        cachingEnabled: false,
+        cacheClusterEnabled: false,
+        // cacheClusterSize: '0.5', // 0.5GB cache
+        // cacheTtl: cdk.Duration.minutes(5), // 5-minute TTL for GET requests
       },
       defaultCorsPreflightOptions: {
         allowOrigins: apigateway.Cors.ALL_ORIGINS, // TODO: Restrict in production
@@ -288,9 +289,9 @@ export class ApiStack extends cdk.Stack {
       exportName: `${serviceName}-${stage}-api-id`,
     });
 
-    new cdk.CfnOutput(this, 'ApiCacheEnabled', {
-      value: 'true',
-      description: 'API Gateway caching enabled (5-minute TTL for GET requests)',
+    new cdk.CfnOutput(this, 'ApiCacheDisabled', {
+      value: 'Disabled for dev (saves $14/month)',
+      description: 'API Gateway caching disabled to reduce costs during development',
     });
 
     new cdk.CfnOutput(this, 'AccessLogGroup', {
