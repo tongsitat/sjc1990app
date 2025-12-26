@@ -2,6 +2,7 @@ import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../providers/auth_provider.dart';
+import 'profile_setup_screen.dart';
 
 class SmsVerificationScreen extends ConsumerStatefulWidget {
   final String phoneNumber;
@@ -75,18 +76,21 @@ class _SmsVerificationScreenState
           );
 
       // Verification successful - user is now logged in
-      // The AuthGate will automatically navigate to HomePage
-      // or PendingApprovalScreen based on user status
+      // Navigate to profile setup to continue registration
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(
-            content: Text('✅ Phone verified! Welcome!'),
+            content: Text('✅ Phone verified! Let\'s set up your profile'),
             backgroundColor: Colors.green,
           ),
         );
 
-        // Pop all navigation stack to go back to AuthGate
-        Navigator.of(context).popUntil((route) => route.isFirst);
+        // Navigate to profile setup screen
+        Navigator.of(context).pushReplacement(
+          MaterialPageRoute(
+            builder: (context) => const ProfileSetupScreen(),
+          ),
+        );
       }
     } catch (e) {
       // Error is already set in auth state
