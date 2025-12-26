@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../providers/auth_provider.dart';
+import '../../utils/page_transitions.dart';
 import 'register_screen.dart';
 
 class LoginScreen extends ConsumerStatefulWidget {
@@ -252,10 +253,10 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
                     onPressed: authState.isLoading
                         ? null
                         : () {
-                            Navigator.of(context).push(
-                              MaterialPageRoute(
-                                builder: (context) => const RegisterScreen(),
-                              ),
+                            AppNavigator.slideToPage(
+                              context,
+                              const RegisterScreen(),
+                              direction: AxisDirection.up,
                             );
                           },
                     style: OutlinedButton.styleFrom(

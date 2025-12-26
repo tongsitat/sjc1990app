@@ -5,6 +5,7 @@ import 'providers/auth_provider.dart';
 import 'screens/auth/login_screen.dart';
 import 'screens/auth/pending_approval_screen.dart';
 import 'screens/home/home_screen.dart';
+import 'screens/splash_screen.dart';
 
 void main() async {
   // Ensure Flutter bindings are initialized
@@ -45,13 +46,9 @@ class AuthGate extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     final authState = ref.watch(authProvider);
 
-    // Show loading while initializing
+    // Show splash screen while initializing
     if (authState.isLoading) {
-      return const Scaffold(
-        body: Center(
-          child: CircularProgressIndicator(),
-        ),
-      );
+      return const SplashScreen();
     }
 
     // Show login if not authenticated

@@ -2,6 +2,7 @@ import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../providers/auth_provider.dart';
+import '../../utils/page_transitions.dart';
 import 'profile_setup_screen.dart';
 
 class SmsVerificationScreen extends ConsumerStatefulWidget {
@@ -85,11 +86,10 @@ class _SmsVerificationScreenState
           ),
         );
 
-        // Navigate to profile setup screen
-        Navigator.of(context).pushReplacement(
-          MaterialPageRoute(
-            builder: (context) => const ProfileSetupScreen(),
-          ),
+        // Navigate to profile setup screen with smooth transition
+        AppNavigator.slideReplacementToPage(
+          context,
+          const ProfileSetupScreen(),
         );
       }
     } catch (e) {
